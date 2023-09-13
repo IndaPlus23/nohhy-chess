@@ -4,12 +4,9 @@ use std::cmp;
 fn main() {
     let mut ab_str = String::new();
 
-    println!("Input width and height: ");
-
     io::stdin()
         .read_line(&mut ab_str)
         .expect("Invalid input");
-
 
     let ab_vec : Vec<&str> = ab_str
         .trim()
