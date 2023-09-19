@@ -1,5 +1,5 @@
-use core::num;
 use std::fmt;
+use std::collections::HashMap;
 
 pub struct Game {
     board : [[Option<Piece>; 8] ; 8],
@@ -14,7 +14,8 @@ pub struct Game {
     rook_move_directions : Vec<(i32, i32)>,
     bishop_move_directions : Vec<(i32, i32)>,
     queen_move_directions : Vec<(i32, i32)>,
-    knight_move_directions : Vec<(i32, i32)>
+    knight_move_directions : Vec<(i32, i32)>,
+    previous_state : Option<((usize, usize, Option<Piece>), (usize, usize, Option<Piece>))>,
 }
 
 impl fmt::Debug for Game {
@@ -105,6 +106,7 @@ impl Game {
             bishop_move_directions,
             queen_move_directions,
             knight_move_directions,
+            previous_state : None
         }
     }
 
@@ -191,8 +193,20 @@ impl Game {
     /// For algebraic notation see https://www.chess.com/terms/chess-notation#readalgebraic
     /// Returns Ok(true) if move is valid, Ok(false) if invalid
     pub fn make_move(&mut self, from : &str, to : &str) -> Result<bool, String> {
-        let (i1, j1) = alg_notation_to_indx(from)?;
-        let (i2, j2) = alg_notation_to_indx(to)?;
+        let from = alg_notation_to_indx(from)?;
+        let to = alg_notation_to_indx(to)?;
+
+        self.make_move_with_index(from, to)
+    }
+
+    fn make_move_with_index(&mut self, from : (usize, usize), to : (usize, usize)) -> Result<bool, String> {
+        let (i1, j1) = from;
+        let (i2, j2) = to;
+
+        self.previous_state = Some((
+            (i1, j1, self.board[i1][j1]),
+            (i2, j2, self.board[i2][j2]),
+        ));
 
         self.board[i2][j2] = self.board[i1][j1];
         self.board[i1][j1] = None;
@@ -200,7 +214,14 @@ impl Game {
         Ok(true)
     }
 
-    fn get_pseudo_legal_moves(&self, i : usize, j : usize) -> Result<Vec<(usize, usize)>, String>{
+    fn undo_last_move(&mut self){
+        if self.previous_state.is_some(){
+            self.board[self.previous_state.unwrap().0.0][self.previous_state.unwrap().0.1] = self.previous_state.unwrap().0.2;
+            self.board[self.previous_state.unwrap().1.0][self.previous_state.unwrap().1.1] = self.previous_state.unwrap().1.2;
+        }
+    }
+
+    fn get_pseudo_legal_moves_for_square(&self, i : usize, j : usize, only_captures : bool) -> Result<Vec<(usize, usize)>, String>{
         if !is_valid_pos(i as i32, j as i32) {
             return Err(format!("Invalid index : Cannot compute pseudo-legal moves for index {i}, {j}"))
         }
@@ -208,12 +229,12 @@ impl Game {
         match self.board[i][j] {
             None => return Ok(Vec::new()),
             Some(piece) => match piece.piece_type {
-                PieceType::Pawn => Ok(self.pawn_pseudo_legal_moves(i, j)),
+                PieceType::Pawn => Ok(self.pawn_pseudo_legal_moves(i, j, only_captures)),
                 PieceType::Rook => Ok(self.directional_pseudo_legal_moves(i, j, &self.rook_move_directions, 8)),
                 PieceType::Bishop =>  Ok(self.directional_pseudo_legal_moves(i, j, &self.bishop_move_directions, 8)),
                 PieceType::Knight => Ok(self.directional_pseudo_legal_moves(i, j, &self.knight_move_directions, 1)),
                 PieceType::Queen => Ok(self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 8)),
-                PieceType::King => Ok(self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 1)),
+                PieceType::King => Ok(self.king_pseudo_legal_moves(i, j)),
             }
         }
     }
@@ -221,6 +242,7 @@ impl Game {
     //compute pseudo-legal moves for pieces that move in given directions
     //max_moves indicates how far a piece can "slide"
     //used for calculating pseudo-legal moves for every piece except for the pawn and king*
+    // *the king has it's own function to include casteling, but uses this function as well
     fn directional_pseudo_legal_moves(&self, i : usize, j : usize, directions : &Vec<(i32, i32)>, max_moves : u32) -> Vec<(usize, usize)> {
         let piece_color = self.board[i][j].unwrap().color;
 
@@ -271,7 +293,7 @@ impl Game {
         return moves_vec;
     }
 
-    fn pawn_pseudo_legal_moves(&self, i : usize, j : usize)-> Vec<(usize, usize)> {
+    fn pawn_pseudo_legal_moves(&self, i : usize, j : usize, only_captures : bool)-> Vec<(usize, usize)> {
         let pawn_color = self.board[i][j].unwrap().color;
 
         let d : i32 = match pawn_color {
@@ -283,42 +305,54 @@ impl Game {
 
         let i_indx = i as i32 + d;
 
-        //check squares in front of the pawn
-        if is_valid_pos(i_indx, j as i32){
-            let i_indx = i_indx as usize;
-            //square 1 in front
-            if self.board[i_indx][j].is_none(){
-                moves_vec.push((i_indx, j));
-
-                //2 squares in front
-                //only possible if pawn is on 2nd or 7th rank depending on color
-                match pawn_color {
-                    Color::White => {
-                        if i == 6 && self.board[4][j].is_none(){
-                            moves_vec.push((4, j));
-                        }
-                    },
-        
-                    Color::Black => {
-                        if i == 1 && self.board[3][j].is_none(){
-                            moves_vec.push((3, j));
-                        }
-                    },
-                };
+        if !only_captures {
+            //check squares in front of the pawn
+            if is_valid_pos(i_indx, j as i32){
+                let i_indx = i_indx as usize;
+                //square 1 in front
+                if self.board[i_indx][j].is_none(){
+                    moves_vec.push((i_indx, j));
+    
+                    //2 squares in front
+                    //only possible if pawn is on 2nd or 7th rank depending on color
+                    match pawn_color {
+                        Color::White => {
+                            if i == 6 && self.board[4][j].is_none(){
+                                moves_vec.push((4, j));
+                            }
+                        },
+            
+                        Color::Black => {
+                            if i == 1 && self.board[3][j].is_none(){
+                                moves_vec.push((3, j));
+                            }
+                        },
+                    };
+                }
             }
-        }
-
-        //check squares that the pawn can capture
-        if is_valid_pos(i_indx, (j + 1) as i32){
-            let i_indx = i_indx as usize;
-            if self.pawn_can_capture(i_indx, j + 1, pawn_color) {
+            //check squares that the pawn can capture
+            if is_valid_pos(i_indx, (j + 1) as i32){
+                let i_indx = i_indx as usize;
+                if self.pawn_can_capture(i_indx, j + 1, pawn_color) {
+                    moves_vec.push((i_indx, j + 1))
+                }
+            }
+    
+            if is_valid_pos(i_indx, j as i32 - 1){
+                let i_indx = i_indx as usize;
+                if self.pawn_can_capture(i_indx, j - 1, pawn_color) {
+                    moves_vec.push((i_indx, j - 1))
+                }
+            }
+        } else {
+            //check squares that the pawn can capture
+            if is_valid_pos(i_indx, (j + 1) as i32){
+                let i_indx = i_indx as usize;
                 moves_vec.push((i_indx, j + 1))
             }
-        }
-
-        if is_valid_pos(i_indx, (j - 1) as i32){
-            let i_indx = i_indx as usize;
-            if self.pawn_can_capture(i_indx, j - 1, pawn_color) {
+    
+            if is_valid_pos(i_indx, j as i32 - 1){
+                let i_indx = i_indx as usize;
                 moves_vec.push((i_indx, j - 1))
             }
         }
@@ -348,7 +382,99 @@ impl Game {
 
         return false;
     }
+
+//WIP
+//TODO : CASTELING 
+    fn king_pseudo_legal_moves(&self, i : usize, j : usize) -> Vec<(usize, usize)> {
+        let king_color = self.board[i][j].unwrap().color;
+        let move_vec = self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 1);
+
+        return move_vec;
+    }
     
+    //get all attacked squares
+    //does not specify which piece is attacking what
+    fn get_attacked_squares(&self, color : Color) -> Vec<(usize, usize)> {
+        let mut to_vec : Vec<(usize, usize)> = Vec::new();
+
+        for i in 0..8 {
+            for j in 0..8 {
+                if self.board[i][j].is_some() {
+                    if self.board[i][j].unwrap().color == color {
+                        to_vec.append(&mut self.get_pseudo_legal_moves_for_square(i, j, true).unwrap())
+                    }
+                }
+            }
+        }
+
+        return to_vec;
+    }
+
+    //get legal moves for a given square
+    fn get_legal_moves_square(&mut self, i : usize, j : usize) -> Vec<(usize, usize)>{
+        let color = self.board[i][j].unwrap().color;
+
+        let pos = (i, j);
+        let pseudo_legal_moves = self.get_pseudo_legal_moves_for_square(i, j, false).unwrap();
+        let mut legal_moves = Vec::new();
+
+        for mve in pseudo_legal_moves {
+            self.make_move_with_index(pos, mve).unwrap();
+
+            if !self.in_check(color) {
+                legal_moves.push(mve);
+            }
+            
+            self.undo_last_move();
+        }
+
+        return legal_moves;
+    }
+
+    //returns vector of tuples
+    //Each tuple is structured as (from, to), where "from" is the index of the piece that moves
+    //And "to" is a vector of the legal moves for that piece
+    fn get_all_legal_moves(&mut self, color : Color) -> HashMap<(usize, usize), Vec<(usize, usize)>> {
+        let mut move_hash : HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
+
+        for i in 0..8 {
+            for j in 0..8 {
+                if self.board[i][j].is_some() {
+                    if self.board[i][j].unwrap().color == color {
+                        let legal_moves = self.get_legal_moves_square(i, j);
+
+                        move_hash.insert((i, j), legal_moves);
+                    }
+                }
+            }
+        }
+
+        return move_hash;
+    }
+
+    fn in_check(&self, color : Color) -> bool {
+        let attacked_squares = match color {
+            Color::White => self.get_attacked_squares(Color::Black),
+            Color::Black => self.get_attacked_squares(Color::White),
+        };
+
+//TODO : maybe save king positions in Game struct
+
+        //Find king position
+        for i in 0..8 {
+            for j in 0..8 {
+                if self.board[i][j].is_some(){
+                    if self.board[i][j].unwrap().piece_type == PieceType::King
+                    && self.board[i][j].unwrap().color == color
+                    {
+                        return attacked_squares.contains(&(i, j));
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -366,7 +492,7 @@ impl Piece {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum PieceType {
     Pawn,
     Knight,
@@ -469,26 +595,21 @@ mod tests {
         // // board.make_move("g1", "f3").unwrap();
 
         
-        let board = Game::from("rq1r2k1/6pp/b1nNp3/p1B1Pp2/2P1pP2/8/1P2Q1PP/R4R1K w - f6 0 24").unwrap();
+        // let board = Game::from("rq1r2k1/6pp/b1nNp3/p1B1Pp2/2P1pP2/8/1P2Q1PP/R4R1K w - f6 0 24").unwrap();
 
-        let legal_moves =  board.get_pseudo_legal_moves(3, 4).unwrap();
+        let mut board = Game::new_starting_pos();
 
-        println!("{:?}", legal_moves);
+        board.make_move("c8", "a5").unwrap();
+        board.make_move("c2", "c3").unwrap();
+        board.make_move("b8", "f3").unwrap();
+
+        let legal_moves =  board.get_legal_moves_square(6, 4);
+
+        println!("{:?}", board.get_all_legal_moves(Color::White));
+
+        println!("{:?}", board.in_check(Color::White));
+        println!("{:?}", board.in_check(Color::Black));
 
         board.print_with_highlights(legal_moves);
     }
-
-    // #[test]
-
-    // fn play_game(moves_str : &str) {
-    //     for (i, mv) in moves_str.split_whitespace().enumerate() {
-    //         if !(i % 3 == 0) {
-    //                                                                                      // from u/burntsushi on reddit
-    //             let last_two_at = s.char_indices().rev().map(|(i, _)| i).nth(1).unwrap();// gets last 2 letters of the str
-    //             let last_two = &s[last_two_at..];                            // 
-
-
-    //         }
-    //     }
-    // }
 }
