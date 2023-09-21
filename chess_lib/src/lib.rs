@@ -1,17 +1,17 @@
 use std::fmt;
 use std::collections::HashMap;
+use std::hash::Hash;
+
 
 ///TODO
-/// - Board to FEN function
-/// - PGN format parser
 /// - Check which functions should be public
 /// - Change name of functions for usability
-/// - Save king positions in Game struct to speed up in_check() function
 /// - Documentation
 /// - more testing
 
 ///DONE (may still include bugs)
 /// - Create Game object from FEN string
+/// - Create FEN string from Game object
 /// - Piece movement
 /// - alg notation to index converter and vice versa
 /// - Update game variables after each move
@@ -39,7 +39,7 @@ pub struct Game {
     black_attacked_squares : Vec<(usize, usize)>,
     insufficient_material : Vec<Vec<PieceType>>,
     captures : Vec<Piece>,
-    promotion_piece : PieceType,
+    promotion_piece : PieceType
 }
 
 impl fmt::Debug for Game {
@@ -148,7 +148,7 @@ impl Game {
             black_attacked_squares : Vec::new(),
             insufficient_material: unwinnable_states,
             captures : Vec::new(),
-            promotion_piece : PieceType::Queen,
+            promotion_piece : PieceType::Queen
         }
     }
 
@@ -199,7 +199,12 @@ impl Game {
                 'Q' => {board.queenside_castle.insert(Color::White, true); },
                 'k' => {board.kingside_castle.insert(Color::Black, true); },
                 'q' => {board.queenside_castle.insert(Color::Black, true); },
-                '-' => continue,
+                '-' => {
+                    board.kingside_castle.insert(Color::White, false);
+                    board.queenside_castle.insert(Color::White, false); 
+                    board.kingside_castle.insert(Color::Black, false);
+                    board.queenside_castle.insert(Color::Black, false);
+                },
                 _c => return Err(format!("Invalid casteling field {}", _c)),
             } 
         }
@@ -233,6 +238,91 @@ impl Game {
         return Result::Ok(board);
     }
 
+    pub fn to_fen(&self) -> String {
+        let mut fen_str = String::new();
+
+        let mut empty_squares = 0;
+
+        //field 1 - piece placement
+        for i in 0..8 {
+            for j in 0..8 {
+                if self.board[i][j].is_some() {
+                    if empty_squares != 0 {
+                        fen_str.push(char::from_digit(empty_squares, 10).unwrap());
+                    }
+
+                    fen_str.push(get_piece_notation(self.board[i][j].unwrap()));
+
+                    empty_squares = 0;
+                } else {
+                    empty_squares += 1;
+                }
+            }
+            if empty_squares != 0 {
+                fen_str.push(char::from_digit(empty_squares, 10).unwrap());
+            }
+            if i != 7{fen_str.push('/');}
+            empty_squares = 0;
+        }
+
+        fen_str.push(' ');
+
+        //field 2 - turn
+
+        match self.turn {
+            Color::White => fen_str.push('w'),
+            Color::Black => fen_str.push('b'),
+        }
+
+        fen_str.push(' ');
+
+        //field 3 - casteling
+        let mut add_dash = true;
+
+        if *self.kingside_castle.get(&Color::White).unwrap() {
+            fen_str.push('K');
+            add_dash = false;
+        }
+        if *self.queenside_castle.get(&Color::White).unwrap() {
+            fen_str.push('Q');
+            add_dash = false;
+        }
+        if *self.kingside_castle.get(&Color::Black).unwrap() {
+            fen_str.push('k');
+            add_dash = false;
+        }
+        if *self.queenside_castle.get(&Color::Black).unwrap() {
+            fen_str.push('q');
+            add_dash = false;
+        }
+
+        if add_dash {
+            fen_str.push('-');
+        }
+
+        //field 4 - en passant
+        fen_str.push(' ');
+
+        let en_passant_square = match self.en_passant_square {
+            Some(square) => indx_to_alg_notation(square).unwrap(),
+            None => String::from("-"),
+        };
+
+        fen_str.push_str(&en_passant_square);
+
+        fen_str.push(' ');
+
+        //field 5 - halfmoves
+        fen_str.push_str(&self.half_moves.to_string());
+
+        fen_str.push(' ');
+
+        //field 6 - fullmoves
+        fen_str.push_str(&self.full_moves.to_string());
+
+        return fen_str;
+    }
+
     /// Move piece on the board. "from" and "to" are in algebraic notation, with turn number and piece type omitted
     /// eg from = e2, to = e4
     /// For algebraic notation see https://www.chess.com/terms/chess-notation#readalgebraic
@@ -246,10 +336,7 @@ impl Game {
 
     /// Same functionality as make_move, but uses array indicies instead of algebraic notation
     pub fn make_move_array_index(&mut self, from : (usize, usize), to : (usize, usize)) -> Result<bool, String> {
-        let (i1, j1) = from;
-        let (i2, j2) = to;
-
-        if is_valid_pos(i1 as i32, j1 as i32) && is_valid_pos(i2 as i32, j2 as i32) {
+        if is_valid_move(from, to){
             return self.make_move_with_index(from, to, true);
         }
 
@@ -263,7 +350,7 @@ impl Game {
         //abort if move is illegal
         //ignored if check_legal is false
         if check_legal{
-            if !(self.get_legal_moves_square(i1, j2).contains(&(i2, j2))) {
+            if !(self.get_legal_moves_square(i1, j1).contains(&(i2, j2))) {
                 return Ok(false);
             }
         }
@@ -329,14 +416,7 @@ impl Game {
                 self.en_passant_square = Some(((i1 + i2) / 2, j1))
             }
 
-            let promotion_rank = match pawn_color {
-                Color::White => 0,
-                Color::Black => 7,
-            };
-
-            if i2 == promotion_rank {
-                //sets current position of pawn to promotion piece
-                //the piece gets moved later in the function
+            if self.is_promotion_move(from, to) {
                 self.board[i1][j1] = Some(Piece::new(self.promotion_piece, pawn_color));
             }
         }
@@ -356,7 +436,23 @@ impl Game {
         Ok(true)
     }
 
-    fn undo_last_move(&mut self){
+    /// Checks wether or not a move is a promotion move
+    pub fn is_promotion_move(&self, from : (usize, usize), to : (usize, usize)) -> bool {
+        if is_valid_move(from, to){
+            let pawn_color = self.board[from.0][from.1].unwrap().color;
+        
+            let promotion_rank = match pawn_color {
+                Color::White => 0,
+                Color::Black => 7,
+            };
+
+            return to.1 == promotion_rank;
+        }
+
+        return false;
+    }
+
+    pub fn undo_last_move(&mut self){
         if self.previous_state.is_none() {return;}
 
         let mut binding = self.previous_state.clone().unwrap();
@@ -642,8 +738,8 @@ impl Game {
         return move_hash;
     }
 
-//TODO : maybe save king positions in Game struct
-    fn in_check(&self, color : Color) -> bool {
+    /// Returns wether a player is in check or not
+    pub fn in_check(&self, color : Color) -> bool {
         let attacked_squares = self.get_attacked_squares(color.opposite());
 
         //Find king position
@@ -786,6 +882,14 @@ fn is_valid_pos(i : i32, j : i32) -> bool {
     i >= 0 && i <= 7 && j >= 0 && j <= 7
 }
 
+fn is_valid_move(from : (usize, usize), to : (usize, usize)) -> bool {
+    let (i1, j1) = from;
+    let (i2, j2) = to;
+    
+    is_valid_pos(i1 as i32, j1 as i32) && is_valid_pos(i2 as i32, j2 as i32)
+}
+
+
 fn get_piece(chr : char) -> Result<Piece, String> {
     match chr {
         'P' => Ok(Piece::new(PieceType::Pawn, Color::White)),
@@ -802,6 +906,23 @@ fn get_piece(chr : char) -> Result<Piece, String> {
         'k' => Ok(Piece::new(PieceType::King, Color::Black)),
         e => Err(e.to_string())
     }       
+}
+
+fn get_piece_notation(piece : Piece) -> char {
+    let mut letter = match piece.piece_type {
+        PieceType::Pawn=> 'P',
+        PieceType::Knight => 'N',
+        PieceType::Bishop => 'B',
+        PieceType::Rook => 'R',
+        PieceType::Queen => 'Q',
+        PieceType::King => 'K',
+    };
+
+    if piece.color == Color::Black {
+        letter = letter.to_ascii_lowercase();
+    }
+
+    return letter;
 }
 
 fn get_repr(piece : Piece) -> char {
@@ -844,7 +965,7 @@ pub fn alg_notation_to_indx(notation : &str) -> Result<(usize , usize), String> 
 
     // 8 - n since ranks in the array are mirrored, and the first rank is at index 7
     let row : usize = 8 - chr_vec[1].to_digit(10).unwrap() as usize;
-
+    
     return Ok((row, col));
 }
 
@@ -893,7 +1014,19 @@ mod tests {
     fn it_works() {   
         let mut board = Game::from("4k3/1P6/4K3/8/8/8/8/8 w - - 0 1").unwrap();
 
-        board.make_move("b7", "b8").unwrap();
+        println!("{:?}", board);
+
+        println!("{:?}", board);
+        println!("{:?}", board.get_state());
+    }
+
+    
+    #[test]
+
+    //Make a board from FEN string
+    //Also displays functionality of get_state()
+    fn fen_to_board_test(){
+        let mut board = Game::from("k1Q2b2/pp6/1qp2p2/3P3p/2p2B1P/2P5/PP4r1/1K1R4 b - - 1 34").unwrap();
 
         println!("{:?}", board);
         println!("{:?}", board.get_state());
@@ -901,13 +1034,24 @@ mod tests {
 
     #[test]
 
-    fn play_game() {
+    //Prints FEN string of starting position
+    fn board_to_fen_test(){
+        let board = Game::new_starting_pos();
+
+        println!("{}", board.to_fen());
+    }
+
+    #[test]
+
+    //Magnus Carlsen (white) vs Eric Rosen (black) - Titled Tuesday Blitz May 16
+    //https://www.chess.com/games/view/16402405 
+    fn real_game_test() {
         let mut board = Game::new_starting_pos();
 
         let moves = vec![
             ("f2", "f4"),
             ("d7", "d5"),
-            ("g1", "g3"),
+            ("g1", "f3"),
             ("g7", "g6"),
             ("d2", "d3"),
             ("f8", "g7"),
@@ -961,7 +1105,7 @@ mod tests {
             ("d5", "c4"),
             ("d4", "d5"),
             ("d8", "b6"),
-            ("f4", "a3"),
+            ("f4", "c1"),
             ("e7", "a3"),
             ("f7", "f8"),
             ("h8", "f8"),
@@ -974,11 +1118,11 @@ mod tests {
             ("f5", "c8"),
         ];
 
-        for (to, from) in moves {
-            println!("{to}, {from}");
+        for (from, to) in moves {
             board.make_move(from, to).unwrap();
         }
-
+        
         println!("{:?}", board);
+        println!("{:?}", board.get_state());
     }
 }
