@@ -901,52 +901,84 @@ mod tests {
 
     #[test]
 
-    fn play_game_from_pgn() {
+    fn play_game() {
         let mut board = Game::new_starting_pos();
 
-        let pgn_str = "1. f4 d5 2. Nf3 g6 3. d3 Bg7 4. e4 c6 5. e5 Nh6 6. d4 Bg4 7. h3 Bxf3 8. Qxf3 Nf5
-        9. c3 e6 10. g4 Nh4 11. Qf2 h5 12. Be3 Nd7 13. Nd2 Bf8 14. O-O-O Be7 15. Bd3 Qa5
-        16. Kb1 O-O-O 17. f5 gxf5 18. gxf5 exf5 19. Bxf5 Nxf5 20. Qxf5 Rdf8 21. Rhg1 Qd8
-        22. Rg7 f6 23. e6 Nb6 24. Bf4 Rfg8 25. Rf7 Rg2 26. h4 Nc4 27. Nxc4 dxc4 28. d5
-        Qb6 29. Bc1 Ba3 30. Rf8+ Rxf8 31. e7+ Kb8 32. Bf4+ Ka8 33. exf8=Q+ Bxf8 34. Qc8#";
+        let moves = vec![
+            ("f2", "f4"),
+            ("d7", "d5"),
+            ("g1", "g3"),
+            ("g7", "g6"),
+            ("d2", "d3"),
+            ("f8", "g7"),
+            ("e2", "e4"),
+            ("c7", "c6"),
+            ("e4", "e5"),
+            ("g8", "h6"),
+            ("d3", "d4"),
+            ("c8", "g4"),
+            ("h2", "h3"),
+            ("g4", "f3"),
+            ("d1", "f3"),
+            ("h6", "f5"),
+            ("c2", "c3"),
+            ("e7", "e6"),
+            ("g2", "g4"),
+            ("f5", "h4"),
+            ("f3", "f2"),
+            ("h7", "h5"),
+            ("c1", "e3"),
+            ("b8", "d7"),
+            ("b1", "d2"),
+            ("g7", "f8"),
+            ("e1", "c1"),
+            ("f8", "e7"),
+            ("f1", "d3"),
+            ("d8", "a5"),
+            ("c1", "b1"),
+            ("e8", "c8"),
+            ("f4", "f5"),
+            ("g6", "f5"),
+            ("g4", "f5"),
+            ("e6", "f5"),
+            ("d3", "f5"),
+            ("h4", "f5"),
+            ("f2", "f5"),
+            ("d8", "f8"),
+            ("h1", "g1"),
+            ("a5", "d8"),
+            ("g1", "g7"),
+            ("f7", "f6"),
+            ("e5", "e6"),
+            ("d7", "b6"),
+            ("e3", "f4"),
+            ("f8", "g8"),
+            ("g7", "f7"),
+            ("g8", "g2"),
+            ("h3", "h4"),
+            ("b6", "c4"),
+            ("d2", "c4"),
+            ("d5", "c4"),
+            ("d4", "d5"),
+            ("d8", "b6"),
+            ("f4", "a3"),
+            ("e7", "a3"),
+            ("f7", "f8"),
+            ("h8", "f8"),
+            ("e6", "e7"),
+            ("c8", "b8"),
+            ("c1", "f4"),
+            ("b8", "a8"),
+            ("e7", "f8"),
+            ("a3", "f8"),
+            ("f5", "c8"),
+        ];
 
-        for (i, s) in pgn_str.split_whitespace().enumerate() {
-            if i % 3 != 0 {
-                let mut parsed_str = s
-                    .replace("+", "")
-                    .replace("#", "");
-
-
-                let piece_color = match i % 3 {
-                    1 => Color::White,
-                    2 => Color::Black,
-                    _ => panic!(),
-                };
-
-                if parsed_str == String::from("O-O"){
-                    //castle kingside
-                    continue;
-                } else if parsed_str == String::from("O-O-O") {
-                    //castle queenside
-                    continue;
-                }
-
-                print!("{parsed_str}");
-
-                let first_letter = parsed_str.chars().next().unwrap();
-
-                //from u/burntsushi on reddit
-                let last_two_at = parsed_str.char_indices().rev().map(|(i, _)| i).nth(1).unwrap();
-                let last_two = &parsed_str[last_two_at..];
-
-                parsed_str.remove(0);
-                parsed_str.pop();
-                parsed_str.pop();
-
-                print!(" {parsed_str}");
-
-                print!("\n");
-            }
+        for (to, from) in moves {
+            println!("{to}, {from}");
+            board.make_move(from, to).unwrap();
         }
+
+        println!("{:?}", board);
     }
 }
