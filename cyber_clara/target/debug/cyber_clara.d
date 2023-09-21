@@ -1,1 +1,0 @@
-C:\Users\Natan\OneDrive\ -\ Örebro\ kommun\Documents\_OneDrive\rust\ code\nohhy-rustIntro\cyber_clara\target\debug\cyber_clara.exe: C:\Users\Natan\OneDrive\ -\ Örebro\ kommun\Documents\_OneDrive\rust\ code\nohhy-rustIntro\cyber_clara\src\main.rs

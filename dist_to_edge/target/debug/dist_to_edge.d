@@ -1,1 +1,0 @@
-C:\Users\natih\OneDrive\Documents\code\rust\ code\INDA_plus\nohhy-rustIntro\dist_to_edge\target\debug\dist_to_edge.exe: C:\Users\natih\OneDrive\Documents\code\rust\ code\INDA_plus\nohhy-rustIntro\dist_to_edge\src\main.rs

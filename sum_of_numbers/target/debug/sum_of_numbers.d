@@ -1,1 +1,0 @@
-C:\Users\Natan\OneDrive\ -\ Örebro\ kommun\Documents\_OneDrive\rust\ code\nohhy-rustIntro\sum_of_numbers\target\debug\sum_of_numbers.exe: C:\Users\Natan\OneDrive\ -\ Örebro\ kommun\Documents\_OneDrive\rust\ code\nohhy-rustIntro\sum_of_numbers\src\main.rs
