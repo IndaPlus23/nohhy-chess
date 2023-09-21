@@ -1,13 +1,32 @@
 use std::fmt;
 use std::collections::HashMap;
 
+///TODO
+/// - Board to FEN function
+/// - PGN format parser
+/// - Check which functions should be public
+/// - Change name of functions for usability
+/// - Save king positions in Game struct to speed up in_check() function
+/// - Documentation
+/// - more testing
+
+///DONE (may still include bugs)
+/// - Create Game object from FEN string
+/// - Piece movement
+/// - alg notation to index converter and vice versa
+/// - Update game variables after each move
+/// - Legal move validation, all pieces + en passant + casteling
+/// - Promotion
+/// - Function to get all legal moves for a player
+/// - Game state function : In progress, Checkmate, Stalemate, Insufficient material, fifty move rule
+/// - Undo moves
+
+#[derive(Clone)]
 pub struct Game {
     board : [[Option<Piece>; 8] ; 8],
     turn : Color,
-    kingside_castle_white : bool,
-    queenside_castle_white : bool,
-    kingside_castle_black : bool,
-    queenside_castle_black : bool,
+    kingside_castle : HashMap<Color, bool>,
+    queenside_castle : HashMap<Color, bool>,
     en_passant_square : Option<(usize, usize)>,
     half_moves : u32,
     full_moves : u32,
@@ -15,7 +34,12 @@ pub struct Game {
     bishop_move_directions : Vec<(i32, i32)>,
     queen_move_directions : Vec<(i32, i32)>,
     knight_move_directions : Vec<(i32, i32)>,
-    previous_state : Option<((usize, usize, Option<Piece>), (usize, usize, Option<Piece>))>,
+    previous_state : Option<Box<Game>>,
+    white_attacked_squares : Vec<(usize, usize)>,
+    black_attacked_squares : Vec<(usize, usize)>,
+    insufficient_material : Vec<Vec<PieceType>>,
+    captures : Vec<Piece>,
+    promotion_piece : PieceType,
 }
 
 impl fmt::Debug for Game {
@@ -38,16 +62,14 @@ impl fmt::Debug for Game {
 }
 
 impl Game {
-
                                                                             //FOR TESTING
     fn print_with_highlights(&self, indx_vec : Vec<(usize, usize)>){
         let mut str = String::new();
 
         let mut i : usize = 0;
-        let mut j : usize = 0;
 
         for row in self.board {
-            j = 0;
+            let mut j = 0;
             for piece in row {
                 match piece {
                     Some(piece) => {
@@ -92,13 +114,28 @@ impl Game {
             [(2, 1), (2, -1), (-2, 1), (-2, -1), (1, 2), (-1, 2), (1, -2), (-1, -2)]
         );
 
+        let unwinnable_states = vec![
+            vec![PieceType::King],
+            vec![PieceType::King, PieceType::Knight],
+            vec![PieceType::Knight, PieceType::King],
+            vec![PieceType::King, PieceType::Bishop],
+            vec![PieceType::Bishop, PieceType::King],
+            vec![PieceType::King, PieceType::Knight, PieceType::Knight],
+            vec![PieceType::Knight, PieceType::King, PieceType::Knight],
+            vec![PieceType::Knight, PieceType::Knight, PieceType::King],
+        ];
+
         Game {
-            board : [[None ; 8] ; 8], // 12x12 to simplifying move validation
+            board : [[None ; 8] ; 8],
             turn : Color::White,
-            kingside_castle_white : true,
-            queenside_castle_white : true,
-            kingside_castle_black : true,
-            queenside_castle_black : true,
+            kingside_castle : HashMap::from([
+                (Color::White, true),
+                (Color::Black, true),
+            ]),
+            queenside_castle : HashMap::from([
+                (Color::White, true),
+                (Color::Black, true),
+            ]),
             en_passant_square : None,
             half_moves : 0,
             full_moves : 0,
@@ -106,7 +143,12 @@ impl Game {
             bishop_move_directions,
             queen_move_directions,
             knight_move_directions,
-            previous_state : None
+            previous_state : None,
+            white_attacked_squares : Vec::new(),
+            black_attacked_squares : Vec::new(),
+            insufficient_material: unwinnable_states,
+            captures : Vec::new(),
+            promotion_piece : PieceType::Queen,
         }
     }
 
@@ -153,10 +195,10 @@ impl Game {
         // Map Casteling rights string to Board
         for c in fen_fields[2].chars() {
             match c {
-                'K' => board.kingside_castle_white = true,
-                'Q' => board.queenside_castle_white = true,
-                'k' => board.kingside_castle_black = true,
-                'q' => board.queenside_castle_black = true,
+                'K' => {board.kingside_castle.insert(Color::White, true); },
+                'Q' => {board.queenside_castle.insert(Color::White, true); },
+                'k' => {board.kingside_castle.insert(Color::Black, true); },
+                'q' => {board.queenside_castle.insert(Color::Black, true); },
                 '-' => continue,
                 _c => return Err(format!("Invalid casteling field {}", _c)),
             } 
@@ -185,6 +227,9 @@ impl Game {
             Err(e) => return Err(e.to_string()),
         };
 
+        board.update_attacked_squares();
+        // board.update_state();
+
         return Result::Ok(board);
     }
 
@@ -196,32 +241,137 @@ impl Game {
         let from = alg_notation_to_indx(from)?;
         let to = alg_notation_to_indx(to)?;
 
-        self.make_move_with_index(from, to)
+        self.make_move_with_index(from, to, true)
     }
 
-    fn make_move_with_index(&mut self, from : (usize, usize), to : (usize, usize)) -> Result<bool, String> {
+    /// Same functionality as make_move, but uses array indicies instead of algebraic notation
+    pub fn make_move_array_index(&mut self, from : (usize, usize), to : (usize, usize)) -> Result<bool, String> {
         let (i1, j1) = from;
         let (i2, j2) = to;
 
-        self.previous_state = Some((
-            (i1, j1, self.board[i1][j1]),
-            (i2, j2, self.board[i2][j2]),
-        ));
+        if is_valid_pos(i1 as i32, j1 as i32) && is_valid_pos(i2 as i32, j2 as i32) {
+            return self.make_move_with_index(from, to, true);
+        }
 
+        Ok(false)
+    }
+
+    fn make_move_with_index(&mut self, from : (usize, usize), to : (usize, usize), check_legal : bool) -> Result<bool, String> {
+        let (i1, j1) = from;
+        let (i2, j2) = to;
+
+        //abort if move is illegal
+        //ignored if check_legal is false
+        if check_legal{
+            if !(self.get_legal_moves_square(i1, j2).contains(&(i2, j2))) {
+                return Ok(false);
+            }
+        }
+
+        //save board state
+        self.previous_state = Some(Box::new(self.clone()));
+
+        //increment half moves, if there is a capture or pawn move this will be reset
+        self.half_moves += 1;
+        self.en_passant_square = None;
+
+        //Capture logic
+        if self.board[i2][j2].is_some() {
+            self.captures.push(self.board[i2][j2].unwrap());
+            self.half_moves = 0; //piece captured : resets half moves
+        }
+
+        //Check if casteling
+        if self.board[i1][j1].unwrap().piece_type == PieceType::King {
+            let d = j1 as i32 - j2 as i32;
+
+            //check if king is moved 2 squares
+            if d.abs() == 2 {
+                //remove casteling rights
+                let king_color = self.board[i1][j1].unwrap().color;
+                self.kingside_castle.insert(king_color, false);
+                self.queenside_castle.insert(king_color, false);
+
+                //kingside castle
+                if d < 0 {
+                    self.board[i1][5] = self.board[i1][7];
+                    self.board[i1][7] = None;
+                } else { //queenside castle
+                    self.board[i1][3] = self.board[i1][0];
+                    self.board[i1][0] = None;
+                }
+            }
+        } else if self.board[i1][j1].unwrap().piece_type == PieceType::Rook {
+            //remove casteling rights if the rook is moved
+
+            let rook_color = self.board[i1][j1].unwrap().color;
+
+            let starting_rank = match rook_color {
+                Color::White => 7,
+                Color::Black => 0,
+            };
+
+            if i1 == starting_rank {
+                match j1 {
+                    0 => {self.queenside_castle.insert(rook_color, false);},
+                    7 => {self.kingside_castle.insert(rook_color, false);},
+                    _ => (),
+                }
+            }
+        } else if self.board[i1][j1].unwrap().piece_type == PieceType::Pawn {
+            let pawn_color = self.board[i1][j1].unwrap().color;
+            self.half_moves = 0; //pawn moved : reset half moves
+
+            //check if pawn is moved two squares
+            let d = i1 as i32 - i2 as i32;
+
+            if d.abs() == 2 {
+                self.en_passant_square = Some(((i1 + i2) / 2, j1))
+            }
+
+            let promotion_rank = match pawn_color {
+                Color::White => 0,
+                Color::Black => 7,
+            };
+
+            if i2 == promotion_rank {
+                //sets current position of pawn to promotion piece
+                //the piece gets moved later in the function
+                self.board[i1][j1] = Some(Piece::new(self.promotion_piece, pawn_color));
+            }
+        }
+
+        //make move
         self.board[i2][j2] = self.board[i1][j1];
         self.board[i1][j1] = None;
+
+        self.update_attacked_squares();
+
+        if self.turn == Color::Black {
+            self.full_moves += 1;
+        }
+
+        self.turn = self.turn.opposite();
 
         Ok(true)
     }
 
     fn undo_last_move(&mut self){
-        if self.previous_state.is_some(){
-            self.board[self.previous_state.unwrap().0.0][self.previous_state.unwrap().0.1] = self.previous_state.unwrap().0.2;
-            self.board[self.previous_state.unwrap().1.0][self.previous_state.unwrap().1.1] = self.previous_state.unwrap().1.2;
-        }
+        if self.previous_state.is_none() {return;}
+
+        let mut binding = self.previous_state.clone().unwrap();
+        let prev = binding.as_mut();
+        self.board = prev.board;
+        self.kingside_castle = prev.kingside_castle.clone();
+        self.queenside_castle = prev.queenside_castle.clone();
+        self.en_passant_square = prev.en_passant_square;
+        self.half_moves = prev.half_moves;
+        self.full_moves = prev.full_moves;
+        self.previous_state = prev.previous_state.clone();
+        self.turn = prev.turn;
     }
 
-    fn get_pseudo_legal_moves_for_square(&self, i : usize, j : usize, only_captures : bool) -> Result<Vec<(usize, usize)>, String>{
+    fn get_pseudo_legal_moves_for_square(&self, i : usize, j : usize, only_attacked : bool) -> Result<Vec<(usize, usize)>, String>{
         if !is_valid_pos(i as i32, j as i32) {
             return Err(format!("Invalid index : Cannot compute pseudo-legal moves for index {i}, {j}"))
         }
@@ -229,12 +379,12 @@ impl Game {
         match self.board[i][j] {
             None => return Ok(Vec::new()),
             Some(piece) => match piece.piece_type {
-                PieceType::Pawn => Ok(self.pawn_pseudo_legal_moves(i, j, only_captures)),
-                PieceType::Rook => Ok(self.directional_pseudo_legal_moves(i, j, &self.rook_move_directions, 8)),
-                PieceType::Bishop =>  Ok(self.directional_pseudo_legal_moves(i, j, &self.bishop_move_directions, 8)),
-                PieceType::Knight => Ok(self.directional_pseudo_legal_moves(i, j, &self.knight_move_directions, 1)),
-                PieceType::Queen => Ok(self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 8)),
-                PieceType::King => Ok(self.king_pseudo_legal_moves(i, j)),
+                PieceType::Pawn => Ok(self.pawn_pseudo_legal_moves(i, j, only_attacked)),
+                PieceType::Rook => Ok(self.directional_pseudo_legal_moves(i, j, &self.rook_move_directions, 8, only_attacked)),
+                PieceType::Bishop =>  Ok(self.directional_pseudo_legal_moves(i, j, &self.bishop_move_directions, 8, only_attacked)),
+                PieceType::Knight => Ok(self.directional_pseudo_legal_moves(i, j, &self.knight_move_directions, 1, only_attacked)),
+                PieceType::Queen => Ok(self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 8, only_attacked)),
+                PieceType::King => Ok(self.king_pseudo_legal_moves(i, j, only_attacked)),
             }
         }
     }
@@ -243,7 +393,7 @@ impl Game {
     //max_moves indicates how far a piece can "slide"
     //used for calculating pseudo-legal moves for every piece except for the pawn and king*
     // *the king has it's own function to include casteling, but uses this function as well
-    fn directional_pseudo_legal_moves(&self, i : usize, j : usize, directions : &Vec<(i32, i32)>, max_moves : u32) -> Vec<(usize, usize)> {
+    fn directional_pseudo_legal_moves(&self, i : usize, j : usize, directions : &Vec<(i32, i32)>, max_moves : u32, include_all_attacked : bool) -> Vec<(usize, usize)> {
         let piece_color = self.board[i][j].unwrap().color;
 
         let mut moves_vec : Vec<(usize, usize)> = Vec::new();
@@ -276,6 +426,9 @@ impl Game {
                         None => moves_vec.push((i_m, j_m)),
                         Some(piece) => {
                             if piece.color == piece_color {
+                                if include_all_attacked {
+                                    moves_vec.push((i_m, j_m));
+                                }
                                 break;
                             } else {
                                 moves_vec.push((i_m, j_m));
@@ -293,7 +446,7 @@ impl Game {
         return moves_vec;
     }
 
-    fn pawn_pseudo_legal_moves(&self, i : usize, j : usize, only_captures : bool)-> Vec<(usize, usize)> {
+    fn pawn_pseudo_legal_moves(&self, i : usize, j : usize, only_attacked : bool)-> Vec<(usize, usize)> {
         let pawn_color = self.board[i][j].unwrap().color;
 
         let d : i32 = match pawn_color {
@@ -305,7 +458,7 @@ impl Game {
 
         let i_indx = i as i32 + d;
 
-        if !only_captures {
+        if !only_attacked {
             //check squares in front of the pawn
             if is_valid_pos(i_indx, j as i32){
                 let i_indx = i_indx as usize;
@@ -383,35 +536,72 @@ impl Game {
         return false;
     }
 
-//WIP
-//TODO : CASTELING 
-    fn king_pseudo_legal_moves(&self, i : usize, j : usize) -> Vec<(usize, usize)> {
+    fn king_pseudo_legal_moves(&self, i : usize, j : usize, include_all_attacked : bool) -> Vec<(usize, usize)> {
         let king_color = self.board[i][j].unwrap().color;
-        let move_vec = self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 1);
+        let mut move_vec = self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 1, include_all_attacked);
+
+        let kingside = self.kingside_castle.get(&king_color).unwrap();
+        let queenside = self.queenside_castle.get(&king_color).unwrap();
+
+        //Casteling logic
+        
+        if *kingside {
+            //checks if squares between king and rook are empty, and are not attacked
+            if self.board[i][j + 1].is_none() && self.board[i][j + 2].is_none() {
+                let attacked_squres = self.get_attacked_squares(king_color.opposite());
+
+                if !attacked_squres.contains(&(i, j)) && !attacked_squres.contains(&(i, j + 1)) && !attacked_squres.contains(&(i, j + 2))
+                {
+                     move_vec.push((i, j + 2));
+                }
+            }
+        } 
+
+        if *queenside {
+            //checks if squares between king and rook are empty, and are not attacked
+            if self.board[i][j - 1].is_none() && self.board[i][j - 2].is_none() {
+                let attacked_squres = self.get_attacked_squares(king_color.opposite());
+
+                if !attacked_squres.contains(&(i, j)) && !attacked_squres.contains(&(i, j - 1)) && !attacked_squres.contains(&(i, j - 2))
+                {
+                     move_vec.push((i, j - 2));
+                }
+            }
+        }
 
         return move_vec;
     }
     
     //get all attacked squares
     //does not specify which piece is attacking what
-    fn get_attacked_squares(&self, color : Color) -> Vec<(usize, usize)> {
-        let mut to_vec : Vec<(usize, usize)> = Vec::new();
+    fn get_attacked_squares(&self, color : Color) -> &Vec<(usize, usize)> {
+        match color {
+            Color::White => &(self.white_attacked_squares),
+            Color::Black => &(self.black_attacked_squares),
+        }
+    }
+
+    fn update_attacked_squares(&mut self) {
+        let mut white_attack_vec : Vec<(usize, usize)> = Vec::new();
+        let mut black_attack_vec : Vec<(usize, usize)> = Vec::new();
 
         for i in 0..8 {
             for j in 0..8 {
                 if self.board[i][j].is_some() {
-                    if self.board[i][j].unwrap().color == color {
-                        to_vec.append(&mut self.get_pseudo_legal_moves_for_square(i, j, true).unwrap())
+                    match self.board[i][j].unwrap().color{
+                        Color::White => white_attack_vec.append(&mut self.get_pseudo_legal_moves_for_square(i, j, true).unwrap()),
+                        Color::Black => black_attack_vec.append(&mut self.get_pseudo_legal_moves_for_square(i, j, true).unwrap()),
                     }
                 }
             }
         }
 
-        return to_vec;
+        self.white_attacked_squares = white_attack_vec;
+        self.black_attacked_squares = black_attack_vec;
     }
 
     //get legal moves for a given square
-    fn get_legal_moves_square(&mut self, i : usize, j : usize) -> Vec<(usize, usize)>{
+    pub fn get_legal_moves_square(&mut self, i : usize, j : usize) -> Vec<(usize, usize)>{
         let color = self.board[i][j].unwrap().color;
 
         let pos = (i, j);
@@ -419,7 +609,7 @@ impl Game {
         let mut legal_moves = Vec::new();
 
         for mve in pseudo_legal_moves {
-            self.make_move_with_index(pos, mve).unwrap();
+            self.make_move_with_index(pos, mve, false).unwrap();
 
             if !self.in_check(color) {
                 legal_moves.push(mve);
@@ -434,7 +624,7 @@ impl Game {
     //returns vector of tuples
     //Each tuple is structured as (from, to), where "from" is the index of the piece that moves
     //And "to" is a vector of the legal moves for that piece
-    fn get_all_legal_moves(&mut self, color : Color) -> HashMap<(usize, usize), Vec<(usize, usize)>> {
+    pub fn get_all_legal_moves(&mut self, color : Color) -> HashMap<(usize, usize), Vec<(usize, usize)>> {
         let mut move_hash : HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
 
         for i in 0..8 {
@@ -452,13 +642,9 @@ impl Game {
         return move_hash;
     }
 
-    fn in_check(&self, color : Color) -> bool {
-        let attacked_squares = match color {
-            Color::White => self.get_attacked_squares(Color::Black),
-            Color::Black => self.get_attacked_squares(Color::White),
-        };
-
 //TODO : maybe save king positions in Game struct
+    fn in_check(&self, color : Color) -> bool {
+        let attacked_squares = self.get_attacked_squares(color.opposite());
 
         //Find king position
         for i in 0..8 {
@@ -475,6 +661,85 @@ impl Game {
 
         return false;
     }
+
+    fn num_of_legal_moves(&mut self, color : Color) -> u32 {
+        let mut res = 0;
+
+        for moves in self.get_all_legal_moves(color).values(){
+            res += moves.len();
+        }
+
+        return res as u32;
+    }
+
+    //checks if "color" has enough pieces to win
+    fn can_win(&self, color : Color) -> bool {
+
+        let mut pieces = Vec::new();
+
+        for i in 0..8 {
+            for j in 0..8 {
+                if self.board[i][j].is_some(){
+                    if self.board[i][j].unwrap().color == color {
+                        pieces.push(self.board[i][j].unwrap().piece_type);
+                    }
+                }
+            }
+        }
+
+        return !self.insufficient_material.contains(&pieces);
+    }
+
+    pub fn get_state(&mut self) -> GameState{
+        let current_turn_legal_moves = match self.turn {
+            Color::White => self.num_of_legal_moves(Color::White),
+            Color::Black => self.num_of_legal_moves(Color::Black),
+        };
+
+        if current_turn_legal_moves == 0 {
+            if self.in_check(self.turn) {
+                return GameState::Win(WinState::Checkmate(self.turn.opposite()));
+            } else {
+                return GameState::Draw(DrawState::Stalemate);
+            }
+        }
+
+        if self.half_moves >= 100 {
+            return GameState::Draw(DrawState::FiftyMoveRule);
+        }
+
+        if !self.can_win(Color::White) && !self.can_win(Color::Black) {
+            return GameState::Draw(DrawState::InsufficientMaterial);
+        }
+
+        return GameState::InProgress;
+    }
+
+    /// Set which type of piece a pawn should be promoted to
+    /// 
+    /// The promotion piece type is set to Piecetype::Queen by default
+    pub fn set_promotion_type(&mut self, piece_type : PieceType) {
+        self.promotion_piece = piece_type;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum GameState {
+    InProgress,
+    Win(WinState),
+    Draw(DrawState),
+}
+#[derive(Debug, Clone)]
+pub enum DrawState {
+    Stalemate,
+    InsufficientMaterial,
+    FiftyMoveRule
+}
+#[derive(Debug, Clone)]
+
+//Color represents winner
+pub enum WinState {
+    Checkmate(Color)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -493,7 +758,7 @@ impl Piece {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum PieceType {
+pub enum PieceType {
     Pawn,
     Knight,
     Bishop,
@@ -501,10 +766,20 @@ enum PieceType {
     Queen,
     King,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Color {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Hash)]
+pub enum Color {
     White,
     Black,
+}
+
+impl Color {
+    fn opposite(&self) -> Color {
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        }
+    }
 }
 
 fn is_valid_pos(i : i32, j : i32) -> bool {
@@ -550,7 +825,7 @@ fn get_repr(piece : Piece) -> char {
     }
 }
 
-fn alg_notation_to_indx(notation : &str) -> Result<(usize , usize), String> {
+pub fn alg_notation_to_indx(notation : &str) -> Result<(usize , usize), String> {
     let chr_vec = notation
         .chars()
         .collect::<Vec<char>>();
@@ -573,6 +848,33 @@ fn alg_notation_to_indx(notation : &str) -> Result<(usize , usize), String> {
     return Ok((row, col));
 }
 
+pub fn indx_to_alg_notation(indx : (usize, usize)) -> Result<String, String> {
+    let rank : char = match indx.1 {
+        0 => 'a',
+        1 => 'b',
+        2 => 'c',
+        3 => 'd',
+        4 => 'e',
+        5 => 'f',
+        6 => 'g',
+        7 => 'h',
+        _c => return Err(format!("Invalid column {}", _c)),
+    };
+
+    // 8 - n since ranks in the array are mirrored, and the first rank is at index 7
+    let col = match char::from_digit(8 - indx.0 as u32, 10) {
+        Some(c) => c,
+        _ => return Err(format!("Invalid row {}", indx.0)),
+    };
+
+    let mut alg_notation = String::new();
+
+    alg_notation.push(rank);
+    alg_notation.push(col);
+
+    return Ok(alg_notation);
+}
+
 // returns which colored pawn is allowed to en passant on the given rank
 // solves conflict where 2 pawns of opposite color can move to en passant square
 fn can_en_passant(i : usize) -> Option<Color> {
@@ -588,28 +890,63 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        // let mut board = Game::new_starting_pos();
+    fn it_works() {   
+        let mut board = Game::from("4k3/1P6/4K3/8/8/8/8/8 w - - 0 1").unwrap();
 
-        // board.make_move("f7", "f3").unwrap();
-        // // board.make_move("g1", "f3").unwrap();
+        board.make_move("b7", "b8").unwrap();
 
-        
-        // let board = Game::from("rq1r2k1/6pp/b1nNp3/p1B1Pp2/2P1pP2/8/1P2Q1PP/R4R1K w - f6 0 24").unwrap();
+        println!("{:?}", board);
+        println!("{:?}", board.get_state());
+    }
 
+    #[test]
+
+    fn play_game_from_pgn() {
         let mut board = Game::new_starting_pos();
 
-        board.make_move("c8", "a5").unwrap();
-        board.make_move("c2", "c3").unwrap();
-        board.make_move("b8", "f3").unwrap();
+        let pgn_str = "1. f4 d5 2. Nf3 g6 3. d3 Bg7 4. e4 c6 5. e5 Nh6 6. d4 Bg4 7. h3 Bxf3 8. Qxf3 Nf5
+        9. c3 e6 10. g4 Nh4 11. Qf2 h5 12. Be3 Nd7 13. Nd2 Bf8 14. O-O-O Be7 15. Bd3 Qa5
+        16. Kb1 O-O-O 17. f5 gxf5 18. gxf5 exf5 19. Bxf5 Nxf5 20. Qxf5 Rdf8 21. Rhg1 Qd8
+        22. Rg7 f6 23. e6 Nb6 24. Bf4 Rfg8 25. Rf7 Rg2 26. h4 Nc4 27. Nxc4 dxc4 28. d5
+        Qb6 29. Bc1 Ba3 30. Rf8+ Rxf8 31. e7+ Kb8 32. Bf4+ Ka8 33. exf8=Q+ Bxf8 34. Qc8#";
 
-        let legal_moves =  board.get_legal_moves_square(6, 4);
+        for (i, s) in pgn_str.split_whitespace().enumerate() {
+            if i % 3 != 0 {
+                let mut parsed_str = s
+                    .replace("+", "")
+                    .replace("#", "");
 
-        println!("{:?}", board.get_all_legal_moves(Color::White));
 
-        println!("{:?}", board.in_check(Color::White));
-        println!("{:?}", board.in_check(Color::Black));
+                let piece_color = match i % 3 {
+                    1 => Color::White,
+                    2 => Color::Black,
+                    _ => panic!(),
+                };
 
-        board.print_with_highlights(legal_moves);
+                if parsed_str == String::from("O-O"){
+                    //castle kingside
+                    continue;
+                } else if parsed_str == String::from("O-O-O") {
+                    //castle queenside
+                    continue;
+                }
+
+                print!("{parsed_str}");
+
+                let first_letter = parsed_str.chars().next().unwrap();
+
+                //from u/burntsushi on reddit
+                let last_two_at = parsed_str.char_indices().rev().map(|(i, _)| i).nth(1).unwrap();
+                let last_two = &parsed_str[last_two_at..];
+
+                parsed_str.remove(0);
+                parsed_str.pop();
+                parsed_str.pop();
+
+                print!(" {parsed_str}");
+
+                print!("\n");
+            }
+        }
     }
 }
