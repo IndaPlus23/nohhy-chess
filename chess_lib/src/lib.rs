@@ -2,46 +2,90 @@ use std::fmt;
 use std::collections::HashMap;
 use std::hash::Hash;
 
+//TODO
+// - Check which functions should be public
+// - Change name of functions for usability
+// - Documentation
+// - more testing
 
-///TODO
-/// - Check which functions should be public
-/// - Change name of functions for usability
-/// - Documentation
-/// - more testing
 
-///DONE (may still include bugs)
-/// - Create Game object from FEN string
-/// - Create FEN string from Game object
-/// - Piece movement
-/// - alg notation to index converter and vice versa
-/// - Update game variables after each move
-/// - Legal move validation, all pieces + en passant + casteling
-/// - Promotion
-/// - Function to get all legal moves for a player
-/// - Game state function : In progress, Checkmate, Stalemate, Insufficient material, fifty move rule
-/// - Undo moves
-
-#[derive(Clone)]
+/// Main Game struct for chess board representation. 
+/// Used to create a position, and play moves. Includes
+/// move validation, reading game-state, getting captured
+/// pieces and undoing moves.
+/// 
+/// Supports reading data from the board using either algebraic notation
+/// or array indicies. Array indices `i` and `j` represent file and rank respectively,
+/// and `0`, `0` representing a8 in algebraic notation. 
+/// 
+/// # Definition
+/// * Always use one of the two provided constructors, `new_starting_pos()` 
+/// or `from_fen()`. 
+/// 
+/// # Examples
+/// 
+/// * Using new_starting_pos() to create an new game
+/// ```
+/// let game = Game::new_starting_pos();
+/// 
+/// println!("{:?}", game);
+/// ``` 
+/// * Using from_fen() to create a new game, note that this
+/// is the FEN representation for the standard starting position,
+/// so this will be identical to calling new_starting_pos()
+/// ```
+/// let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+/// 
+/// println!("{:?}", game);
+/// ``` 
+/// 
+/// # Errors
+/// 
+/// * Deviating from using the provided constructors may cause
+/// a panic!
+/// 
+/// # Notes
+/// * For algebraic notation, refer to: https://www.chess.com/terms/chess-notation#readalgebraic
+/// * fmt::Debug is implemented for Game. By using debug print syntax
+/// this will print a visual representation the board to the terminal
+#[derive(Clone, PartialEq)]
 pub struct Game {
+    //2d array for board representation, each piece is represented by an Option.
+    //Empty square is represented by Option::None
     board : [[Option<Piece>; 8] ; 8],
+    //turn indicator
     turn : Color,
+    //kingside casteling rights for both players
     kingside_castle : HashMap<Color, bool>,
+    //queenside casteling rights for both players
     queenside_castle : HashMap<Color, bool>,
+    //index of possible en passant square
     en_passant_square : Option<(usize, usize)>,
+    //number of half moves for current position
     half_moves : u32,
+    //number of full moves made in the game
     full_moves : u32,
+    //vectors with move directions for the different pieces
+    //used for generating pseudo-legal moves
     rook_move_directions : Vec<(i32, i32)>,
     bishop_move_directions : Vec<(i32, i32)>,
     queen_move_directions : Vec<(i32, i32)>,
     knight_move_directions : Vec<(i32, i32)>,
+    //previous game state
     previous_state : Option<Box<Game>>,
+    //squares under attack by respective player
     white_attacked_squares : Vec<(usize, usize)>,
     black_attacked_squares : Vec<(usize, usize)>,
+    //states that result in draw by insufficient material
     insufficient_material : Vec<Vec<PieceType>>,
+    //vector of captured pieces
     captures : Vec<Piece>,
-    promotion_piece : PieceType
+    //possible square where pawn be promoted in current position
+    promotion_square : Option<(usize, usize)>
 }
 
+//implements debug for game, using debug print will
+//print visual board representation to screen
 impl fmt::Debug for Game {
     fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
         let mut str = String::new();
@@ -62,41 +106,8 @@ impl fmt::Debug for Game {
 }
 
 impl Game {
-                                                                            //FOR TESTING
-    fn print_with_highlights(&self, indx_vec : Vec<(usize, usize)>){
-        let mut str = String::new();
-
-        let mut i : usize = 0;
-
-        for row in self.board {
-            let mut j = 0;
-            for piece in row {
-                match piece {
-                    Some(piece) => {
-                        if indx_vec.contains(&(i, j)){
-                            str.push('*')
-                        } else { 
-                            str.push(get_repr(piece))
-                        }
-                    },
-                    None => {
-                        if indx_vec.contains(&(i, j)){
-                            str.push('*')
-                        } else {
-                            str.push('.')
-                        }
-                    },
-                }
-                str.push(' ');
-                j += 1;
-            }
-            str.push('\n');
-            i += 1;
-        }
-
-        println!("{}", str)
-    }
-                                                                            //FOR TESTING
+    //creates empty board
+    //helper function for from_fen() constructor
     fn new_empty() -> Game {
         let rook_move_directions : Vec<(i32, i32)> = Vec::from(
             [(1, 0), (-1, 0), (0, 1), (0, -1)]
@@ -148,17 +159,73 @@ impl Game {
             black_attacked_squares : Vec::new(),
             insufficient_material: unwinnable_states,
             captures : Vec::new(),
-            promotion_piece : PieceType::Queen
+            promotion_square : None,
         }
     }
-
+    /// Create a new board with the standard starting position.
+    /// 
+    /// # Examples
+    /// ```
+    /// let mut game = Game::new_starting_pos();
+    /// 
+    /// game.make_move("e2", "e4", true).unwrap();
+    /// ```
+    /// 
+    /// # Notes
+    /// * safe unwrap() call since fen_str is hard-coded
     pub fn new_starting_pos() -> Game {
-        Game::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
+        Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 
-    /// Create board from FEN string
-    /// For FEN format see https://en.wikipedia.org/wiki/Forsyth–Edwards_Notation
-    pub fn from(fen_str : &str) -> Result<Game, String> {
+    /// Parses a Forsyth-Edwards Notation (FEN) string and constructs a chess Game representation.
+    ///
+    /// FEN is a standard notation used to describe the state of a chess game. The FEN string consists
+    /// of six fields, separated by spaces, representing the following information (in order):
+    ///
+    /// 1. Piece placement on the board.
+    /// 2. Active color ('w' for White, 'b' for Black).
+    /// 3. Castling availability.
+    /// 4. En passant target square.
+    /// 5. Half-move clock (for the 50-move rule).
+    /// 6. Full-move number (increments after each full move by Black).
+    ///
+    /// # Arguments
+    ///
+    /// * `fen_str` - A string containing the FEN representation of the chess game state.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Game, String>` - A `Result` where `Ok` contains a `Game` instance representing the
+    ///   parsed chess position, and `Err` contains an error message if parsing fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use my_chess_lib::Game;
+    ///
+    /// let fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    ///
+    /// match Game::from(fen_string) {
+    ///     Ok(game) => {
+    ///         // Successfully parsed FEN string into a Game instance.
+    ///         // You can now work with the chess position.
+    ///     },
+    ///     Err(error) => {
+    ///         eprintln!("Error parsing FEN: {}", error);
+    ///     },
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function returns an `Err` variant with an error message if any of the FEN fields contain
+    /// invalid or unexpected values.
+    ///
+    /// # Notes
+    ///
+    /// - The FEN string should adhere to the standard format for accurate parsing.
+    /// - For details on FEN notation, refer to: https://en.wikipedia.org/wiki/Forsyth–Edwards_Notation
+    pub fn from_fen(fen_str : &str) -> Result<Game, String> {
         // Splits up FEN string to the seprate fields
         
         let fen_fields = fen_str
@@ -238,6 +305,38 @@ impl Game {
         return Result::Ok(board);
     }
 
+    /// Generates a Forsyth-Edwards Notation (FEN) string from the current state of the chess game.
+    ///
+    /// FEN is a standard notation used to describe the state of a chess game. The FEN string consists
+    /// of six fields, separated by spaces, representing the following information (in order):
+    ///
+    /// 1. Piece placement on the board.
+    /// 2. Active color ('w' for White, 'b' for Black).
+    /// 3. Castling availability.
+    /// 4. En passant target square.
+    /// 5. Half-move clock (for the 50-move rule).
+    /// 6. Full-move number (increments after each full move by Black).
+    ///
+    /// # Returns
+    ///
+    /// * `String` - A string containing the FEN representation of the current chess game state.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use my_chess_lib::Game;
+    ///
+    /// let mut game = Game::new_starting_position();
+    /// game.make_move("e2", "e4", true).unwrap();
+    ///
+    /// let fen_string = game.to_fen();
+    /// println!("FEN: {}", fen_string);
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// - The generated FEN string adheres to the standard format for accurate representation.
+    /// - For details on FEN notation, refer to: https://en.wikipedia.org/wiki/Forsyth–Edwards_Notation
     pub fn to_fen(&self) -> String {
         let mut fen_str = String::new();
 
@@ -246,12 +345,12 @@ impl Game {
         //field 1 - piece placement
         for i in 0..8 {
             for j in 0..8 {
-                if self.board[i][j].is_some() {
+                if let Some(piece) = self.board[i][j] {
                     if empty_squares != 0 {
                         fen_str.push(char::from_digit(empty_squares, 10).unwrap());
                     }
 
-                    fen_str.push(get_piece_notation(self.board[i][j].unwrap()));
+                    fen_str.push(get_piece_notation(piece));
 
                     empty_squares = 0;
                 } else {
@@ -259,6 +358,7 @@ impl Game {
                 }
             }
             if empty_squares != 0 {
+                //empty_squares always in range 0-8, so from_digit will always return Some(char)
                 fen_str.push(char::from_digit(empty_squares, 10).unwrap());
             }
             if i != 7{fen_str.push('/');}
@@ -279,6 +379,8 @@ impl Game {
         //field 3 - casteling
         let mut add_dash = true;
 
+        //hardcoded get() call, unwrap will always be safe
+        //given that casteling fields are configured correctly
         if *self.kingside_castle.get(&Color::White).unwrap() {
             fen_str.push('K');
             add_dash = false;
@@ -303,6 +405,7 @@ impl Game {
         //field 4 - en passant
         fen_str.push(' ');
 
+        //en passant square always valid index, so unwarp on indx_to_alg_notation() is safe
         let en_passant_square = match self.en_passant_square {
             Some(square) => indx_to_alg_notation(square).unwrap(),
             None => String::from("-"),
@@ -323,34 +426,378 @@ impl Game {
         return fen_str;
     }
 
-    /// Move piece on the board. "from" and "to" are in algebraic notation, with turn number and piece type omitted
-    /// eg from = e2, to = e4
-    /// For algebraic notation see https://www.chess.com/terms/chess-notation#readalgebraic
-    /// Returns Ok(true) if move is valid, Ok(false) if invalid
-    pub fn make_move(&mut self, from : &str, to : &str) -> Result<bool, String> {
+    /// Get piece at given indexed position.
+    /// 
+    /// # Arguments
+    /// * `indx` is a tuple of type `(usize, usize)`, where the first
+    /// element indexes the rank and second element the file.
+    /// Note that array indicies start at 0 in contrast to algebraic notation.
+    /// 
+    /// # Returns
+    /// * `Result<Option<Piece>, String>`, `Option<Piece>` being the corresponding
+    /// value on the board (See `Game` struct for board representation).
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// let game = Game::new_starting_pos();
+    /// 
+    /// let piece = game.piece_at_array_index((0,0));
+    /// let top_left_piece = Piece::new(PieceType::Rook, Color::Black);
+    /// 
+    /// assert_eq!(piece, Ok(Some(top_left_piece)));
+    /// ```
+    /// 
+    /// # Errors
+    /// * Returns `Err(String)` if input is invalid index
+    pub fn piece_at_array_index(&self, indx : (usize, usize)) -> Result<Option<Piece>, String> {
+        let (i, j) = indx;
+
+        if !is_valid_pos(i as i32, j as i32) {
+            return Err(format!("Invalid index {:?}", indx));
+        } else {
+            return Ok(self.board[i][j]);
+        }
+    }
+    /// Get piece at given position using algebraic notation.
+    /// 
+    /// # Arguments
+    /// * `notation` is a `&str` written in algebraic notation.
+    /// 
+    /// # Returns
+    /// * `Result<Option<Piece>, String>`, `Option<Piece>` being the corresponding
+    /// value on the board (See `Game` struct for board representation).
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// let game = Game::new_starting_pos();
+    /// 
+    /// let piece = game.piece_at_array_index("e2");
+    /// let e_pawn = Piece::new(PieceType::Pawn, Color::White);
+    /// 
+    /// assert_eq!(piece, Ok(Some(e_pawn)));
+    /// ```
+    /// 
+    /// # Errors
+    /// * Returns `Err(String)` if input is invalid position
+    pub fn piece_at_alg_notation(&self, notation : &str) -> Result<Option<Piece>, String> {
+        let (i, j) = alg_notation_to_indx(notation)?;
+
+        if !is_valid_pos(i as i32, j as i32) {
+            return Err(format!("Invalid notation {:?}", notation));
+        } else {
+            return Ok(self.board[i][j]);
+        }
+    }
+    /// Make a move on the board using algebraic notation.
+    ///  
+    /// 
+    /// # Arguments
+    /// * `from` and `to` are both in algebraic notation.
+    /// * `from` refers to the square the piece you want to move is currently on, 
+    /// `to` is the square you want to move it to.
+    /// * `auto_promote` is a `bool` indicating wether or not a pawn, once it has 
+    /// reached the end rank, should be promoted automatically. If `true`, it will
+    /// be promoted to a queen automatically, if `false` it will remain a pawn and
+    /// the game state will be `GameState::AwaitPromotion`. The user is then excpected
+    /// to handle promotion explicitly using the `promote_to_piece` method.
+    ///
+    /// # Returns
+    /// * `Result<bool, String>` - A `Result` where `Ok` contains a `bool` representing
+    /// wether or not the move is valid, and `Err` contains an error message if the move fails, or
+    /// if one or both of the provided indicies is invalid.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use my_chess_lib::Game;
+    /// 
+    /// let mut game = Game::new_starting_position();
+    /// let move1 = game.make_move("e2", "e4"); //Moves pawn to e4
+    /// let move2 = game.make_move("f2", "f5"); //Invalid move
+    /// let move3 = game.make_move("", ""); //Invalid format
+    /// 
+    /// assert_eq!(move1, Ok(true));
+    /// assert_eq!(move2, Ok(false)));
+    /// assert_eq!(move3, Err("Invalid notation "));
+    /// 
+    /// ```
+    /// 
+    /// # Notes
+    /// * For algebraic notation, refer to: https://www.chess.com/terms/chess-notation#readalgebraic
+    pub fn make_move(&mut self, from : &str, to : &str, auto_promote : bool) -> Result<bool, String> {
         let from = alg_notation_to_indx(from)?;
         let to = alg_notation_to_indx(to)?;
 
-        self.make_move_with_index(from, to, true)
+        self.make_move_with_index(from, to, true, auto_promote)
     }
 
-    /// Same functionality as make_move, but uses array indicies instead of algebraic notation
-    pub fn make_move_array_index(&mut self, from : (usize, usize), to : (usize, usize)) -> Result<bool, String> {
+    /// Make a move on the board using array indicies.
+    /// 
+    /// # Arguments
+    /// * `from` and `to` are both in algebraic notation.
+    /// * `from` refers to the square the piece you want to move is currently on, 
+    /// `to` is the square you want to move it to.
+    /// * `auto_promote` is a `bool` indicating wether or not a pawn, once it has 
+    /// reached the end rank, should be promoted automatically. If `true`, it will
+    /// be promoted to a queen automatically, if `false` it will remain a pawn and
+    /// the game state will be `GameState::AwaitPromotion`. The user is then excpected
+    /// to handle promotion explicitly using the `promote_to_piece` method.
+    ///
+    /// # Returns
+    /// * `Result<bool, String>` - A `Result` where `Ok` contains a `bool` representing
+    /// wether or not the move is valid, and `Err` contains an error message if the move fails, or
+    /// if one or both of the provided indicies is invalid.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use my_chess_lib::Game;
+    /// 
+    /// let mut game = Game::new_starting_position();
+    /// let move1 = game.make_move("e2", "e4"); //Moves pawn to e4
+    /// let move2 = game.make_move("f2", "f5"); //Invalid move
+    /// let move3 = game.make_move("", ""); //Invalid format
+    /// 
+    /// assert_eq!(move1, Ok(true));
+    /// assert_eq!(move2, Ok(false)));
+    /// assert_eq!(move3, Err("Invalid notation "));
+    /// 
+    /// ```
+    /// 
+    /// # Notes
+    /// * board array indicies start at 0 as opposed to algebraic notation
+    pub fn make_move_array_index(&mut self, from : (usize, usize), to : (usize, usize), auto_promote : bool) -> Result<bool, String> {
         if is_valid_move(from, to){
-            return self.make_move_with_index(from, to, true);
+            return self.make_move_with_index(from, to, true, auto_promote);
         }
 
         Ok(false)
     }
 
-    fn make_move_with_index(&mut self, from : (usize, usize), to : (usize, usize), check_legal : bool) -> Result<bool, String> {
+    /// Used to promote a pawn at the final rank. This method is
+    /// used to promote when using `make_move(auto_promote=false)`. Note
+    /// that this method must be called _after_ calling `make_move`.
+    /// 
+    /// # Arguments
+    /// * `piece_type` is of type `PieceType` and represents the type
+    /// of piece the pawn will be promoted to.
+    /// 
+    /// # Returns
+    /// * `bool` representing wether or not promotion was successful
+    /// 
+    /// # Examples
+    /// * How a game loop might look
+    /// ```
+    /// let mut game = Game::new_starting_pos()
+    /// 
+    /// loop {
+    ///     //Get user input...
+    ///     
+    ///     //`from` and `to` are placeholders
+    ///     game.make_move(from, to, false); //auto_promote set to false
+    /// 
+    ///     match game.get_state() {
+    ///         GameState::AwaitPromotion => {
+    ///             //Prompt user to choose piece
+    /// 
+    ///             //`picked_piece` is a placeholder
+    ///             game.promote_to_piece(picked_piece);
+    ///         }
+    ///         //Handle other cases...
+    ///     }
+    ///}
+    /// ```
+    /// 
+    /// # Notes
+    /// * No logic preventing promoting a pawn to a pawn, 
+    /// however it is not possible to promote it more than once.
+    pub fn promote_to_piece(&mut self, piece_type : PieceType) -> bool {
+        let res = match self.promotion_square {
+            Some(indx) => {self.promote(indx, piece_type); true}
+            None => false,
+        };
+
+        self.promotion_square = None;
+
+        res
+    }
+
+    //helper function for promote_to_piece
+    //places the chosen piece on the board with appropriate color
+    fn promote(&mut self, indx : (usize, usize), piece_type : PieceType) {
+        let (i, j) = indx;
+
+        let piece_color = self.board[i][j].unwrap().color;
+
+        self.board[i][j] = Some(Piece::new(piece_type, piece_color));
+    }
+
+    /// Undo the last move that was made. Reverts pieces
+    /// as well as board state. Multiple calls can be chained together
+    /// to undo multiple moves.
+    pub fn undo_last_move(&mut self){
+        if self.previous_state.is_none() {return;}
+
+        //function returns if previous_state is None, so unwrap is safe
+        let mut binding = self.previous_state.clone().unwrap();
+        let prev = binding.as_mut();
+        self.board = prev.board;
+        self.kingside_castle = prev.kingside_castle.clone();
+        self.queenside_castle = prev.queenside_castle.clone();
+        self.en_passant_square = prev.en_passant_square;
+        self.half_moves = prev.half_moves;
+        self.full_moves = prev.full_moves;
+        self.previous_state = prev.previous_state.clone();
+        self.turn = prev.turn;
+        self.captures = prev.captures.clone();
+    }
+
+    /// Get a `Vec` of legal moves for a given square. The vector consist 
+    /// of tuples `(usize, usize)` descibing the indicies in the 2d board array.
+    /// 
+    /// # Arguments
+    /// * array index in the board, for more detail refer to `Game` struct.
+    /// 
+    /// # Returns
+    /// 
+    /// * Returns `Vec` of tuples `(usize, usize)` describing all array indicies
+    /// that the piece at the provided index can move to.
+    /// * Returns Result with empty vector if the board position is empty.
+    /// 
+    /// # Errors
+    /// 
+    /// * If the provided index is invalid the function returns Err(String)
+    pub fn get_legal_moves_array_index(&mut self, index : (usize, usize)) -> Result<Vec<(usize, usize)>, String>{
+        let (i, j) = index;
+        
+        //return empty vector
+        if !is_valid_pos(i as i32, j as i32){
+            return Err(format!("Invalid index {:?}", index));
+        }
+        
+        let color = match self.board[i][j] {
+            Some(piece) => piece.color,
+            None => return Ok(Vec::new()),
+        };
+
+        let pos = (i, j);
+        //i, j already validated, so unwrap is safe
+        let pseudo_legal_moves = self.get_pseudo_legal_moves_for_square(i, j, false).unwrap();
+        let mut legal_moves = Vec::new();
+
+        for mve in pseudo_legal_moves {
+            //both pos and mve are valid indicies, so unwrap is sage
+            self.make_move_with_index(pos, mve, false, true).unwrap();
+
+            if !self.in_check(color) {
+                legal_moves.push(mve);
+            }
+            
+            self.undo_last_move();
+        }
+
+        return Ok(legal_moves);
+    }
+
+    /// Get all legal moves for a player (color). Returns a HashMap with the key
+    /// being the piece position (usize, usize), and value being a vector of all 
+    /// positions the piece can move to Vec<(usize, usize)>
+    pub fn get_all_legal_moves(&mut self, color : Color) -> HashMap<(usize, usize), Vec<(usize, usize)>> {
+        let mut move_hash : HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
+
+        for i in 0..8 {
+            for j in 0..8 {
+                if let Some(piece) = self.board[i][j] {
+                    if piece.color == color {
+                        //i, j will always be a valid index, so unwrap is safe
+                        let legal_moves = self.get_legal_moves_array_index((i, j)).unwrap();
+                        move_hash.insert((i, j), legal_moves);
+                    }
+                }
+            }
+        }
+
+        return move_hash;
+    }
+
+    /// Returns wether a player is in check or not
+    pub fn in_check(&self, color : Color) -> bool {
+        let attacked_squares = self.get_attacked_squares(color.opposite());
+
+        //Find king position
+        for i in 0..8 {
+            for j in 0..8 {
+                if let Some(piece) = self.board[i][j]{
+                    if piece.piece_type == PieceType::King
+                    && piece.color == color
+                    {
+                        return attacked_squares.contains(&(i, j));
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    
+    pub fn get_state(&mut self) -> GameState{
+        if self.promotion_square.is_some() {
+            return GameState::AwaitPromotion;
+        }
+
+        let current_turn_legal_moves = match self.turn {
+            Color::White => self.num_of_legal_moves(Color::White),
+            Color::Black => self.num_of_legal_moves(Color::Black),
+        };
+
+        if current_turn_legal_moves == 0 {
+            if self.in_check(self.turn) {
+                return GameState::Win(WinState::Checkmate(self.turn.opposite()));
+            } else {
+                return GameState::Draw(DrawState::Stalemate);
+            }
+        }
+
+        if self.half_moves >= 100 {
+            return GameState::Draw(DrawState::FiftyMoveRule);
+        }
+
+        if !self.can_win(Color::White) && !self.can_win(Color::Black) {
+            return GameState::Draw(DrawState::InsufficientMaterial);
+        }
+
+        return GameState::InProgress;
+    }
+
+    pub fn get_active_player(&self) {
+        self.turn;
+    }
+
+    pub fn get_captures(&self, color : Color) -> Vec<Piece>{
+        let mut res = Vec::new();
+
+        for p in &self.captures {
+            if p.color == color.opposite() {
+                res.push(*p);
+            }
+        }
+
+        res
+    }
+
+    fn make_move_with_index(&mut self, from : (usize, usize), to : (usize, usize), check_legal : bool, auto_promote : bool) -> Result<bool, String> {
         let (i1, j1) = from;
         let (i2, j2) = to;
 
-        //abort if move is illegal
+        //return if move is illegal
         //ignored if check_legal is false
         if check_legal{
-            if !(self.get_legal_moves_square(i1, j1).contains(&(i2, j2))) {
+            //get_legal_moves_square() will always return Some() since
+            //index (i1, j1) is validated in make_move_array_index()
+            if !(self.get_legal_moves_array_index((i1, j1)).unwrap().contains(&(i2, j2))) {
                 return Ok(false);
             }
         }
@@ -363,12 +810,14 @@ impl Game {
         self.en_passant_square = None;
 
         //Capture logic
-        if self.board[i2][j2].is_some() {
-            self.captures.push(self.board[i2][j2].unwrap());
+        if let Some(piece) = self.board[i2][j2] {
+            self.captures.push(piece);
             self.half_moves = 0; //piece captured : resets half moves
         }
 
         //Check if casteling
+        //note board[i1][j1] is always Some(Piece) due to how
+        //this function is called, so unwrap() wont panic
         if self.board[i1][j1].unwrap().piece_type == PieceType::King {
             let d = j1 as i32 - j2 as i32;
 
@@ -406,7 +855,6 @@ impl Game {
                 }
             }
         } else if self.board[i1][j1].unwrap().piece_type == PieceType::Pawn {
-            let pawn_color = self.board[i1][j1].unwrap().color;
             self.half_moves = 0; //pawn moved : reset half moves
 
             //check if pawn is moved two squares
@@ -417,13 +865,17 @@ impl Game {
             }
 
             if self.is_promotion_move(from, to) {
-                self.board[i1][j1] = Some(Piece::new(self.promotion_piece, pawn_color));
+                self.promotion_square = Some((i2, j2));
             }
         }
 
         //make move
         self.board[i2][j2] = self.board[i1][j1];
         self.board[i1][j1] = None;
+
+        if auto_promote {
+            self.promote_to_piece(PieceType::Queen);
+        }
 
         self.update_attacked_squares();
 
@@ -436,42 +888,16 @@ impl Game {
         Ok(true)
     }
 
-    /// Checks wether or not a move is a promotion move
-    pub fn is_promotion_move(&self, from : (usize, usize), to : (usize, usize)) -> bool {
-        if is_valid_move(from, to){
-            let pawn_color = self.board[from.0][from.1].unwrap().color;
-        
-            let promotion_rank = match pawn_color {
-                Color::White => 0,
-                Color::Black => 7,
-            };
-
-            return to.1 == promotion_rank;
-        }
-
-        return false;
-    }
-
-    pub fn undo_last_move(&mut self){
-        if self.previous_state.is_none() {return;}
-
-        let mut binding = self.previous_state.clone().unwrap();
-        let prev = binding.as_mut();
-        self.board = prev.board;
-        self.kingside_castle = prev.kingside_castle.clone();
-        self.queenside_castle = prev.queenside_castle.clone();
-        self.en_passant_square = prev.en_passant_square;
-        self.half_moves = prev.half_moves;
-        self.full_moves = prev.full_moves;
-        self.previous_state = prev.previous_state.clone();
-        self.turn = prev.turn;
-    }
-
+    ///Returns Result, if Ok -> Vector of all legal moves (usize, usize) for the given square
+    /// 
+    /// Returns Err if provided index is invalid
     fn get_pseudo_legal_moves_for_square(&self, i : usize, j : usize, only_attacked : bool) -> Result<Vec<(usize, usize)>, String>{
         if !is_valid_pos(i as i32, j as i32) {
             return Err(format!("Invalid index : Cannot compute pseudo-legal moves for index {i}, {j}"))
         }
 
+        //since i, j is validated as a position all calls to pseudo_legal_moves
+        //will not panic when calling unwrap() in the respective function
         match self.board[i][j] {
             None => return Ok(Vec::new()),
             Some(piece) => match piece.piece_type {
@@ -485,10 +911,16 @@ impl Game {
         }
     }
 
-    //compute pseudo-legal moves for pieces that move in given directions
-    //max_moves indicates how far a piece can "slide"
-    //used for calculating pseudo-legal moves for every piece except for the pawn and king*
-    // *the king has it's own function to include casteling, but uses this function as well
+    /// compute pseudo-legal moves for pieces that move in given directions
+    /// max_moves indicates how far a piece can "slide"
+    /// used for calculating pseudo-legal moves for every piece except for the pawn and king*
+    /// 
+    /// *the king has it's own function to include casteling, but uses this function as well
+    /// 
+    /// # Panics
+    /// Function panics if there is not a piece at index i, j
+    /// 
+    /// Function should only be called thorugh get_pseudo_legal_moves_for_square() 
     fn directional_pseudo_legal_moves(&self, i : usize, j : usize, directions : &Vec<(i32, i32)>, max_moves : u32, include_all_attacked : bool) -> Vec<(usize, usize)> {
         let piece_color = self.board[i][j].unwrap().color;
 
@@ -542,6 +974,11 @@ impl Game {
         return moves_vec;
     }
 
+
+    /// # Panics
+    /// Function panics if there is not a piece at index i, j
+    /// 
+    /// Function should only be called thorugh get_pseudo_legal_moves_for_square() 
     fn pawn_pseudo_legal_moves(&self, i : usize, j : usize, only_attacked : bool)-> Vec<(usize, usize)> {
         let pawn_color = self.board[i][j].unwrap().color;
 
@@ -611,10 +1048,11 @@ impl Game {
 
     fn pawn_can_capture(&self, i : usize, j : usize, pawn_color : Color) -> bool {
         //checks if en passant is allowed
-        if self.en_passant_square.is_some(){
-            if self.en_passant_square.unwrap() == (i, j){
-                if can_en_passant(i).unwrap() == pawn_color{
-                    return true;
+        if let Some(en_passant_square) = self.en_passant_square{
+            if en_passant_square == (i, j){
+                match can_en_passant(i) {
+                    Some(color) => return color == pawn_color,
+                    None => return false,
                 }
             }
         } else {
@@ -632,10 +1070,21 @@ impl Game {
         return false;
     }
 
+    /// # Panics
+    /// Function panics if there is not a piece at index i, j.
+    /// 
+    /// Will panic if Game.kingside_castle or Game.queenside_castle fields 
+    /// are missing values for Color::White or Color::Black, but this should
+    /// never be an issue when using constructors in the Game struct.
+    /// 
+    /// Function should only be called thorugh get_pseudo_legal_moves_for_square(), 
+    /// this will guarantee index i, j is a Piece.  
     fn king_pseudo_legal_moves(&self, i : usize, j : usize, include_all_attacked : bool) -> Vec<(usize, usize)> {
         let king_color = self.board[i][j].unwrap().color;
         let mut move_vec = self.directional_pseudo_legal_moves(i, j, &self.queen_move_directions, 1, include_all_attacked);
 
+        //king_color should always be a key in kingside_castle and queenside_castle
+        //unwrap is safe
         let kingside = self.kingside_castle.get(&king_color).unwrap();
         let queenside = self.queenside_castle.get(&king_color).unwrap();
 
@@ -683,8 +1132,11 @@ impl Game {
 
         for i in 0..8 {
             for j in 0..8 {
-                if self.board[i][j].is_some() {
-                    match self.board[i][j].unwrap().color{
+                //check is board[i][j] is some, else get_pseudo_legal_moves_for_square will panic
+                if let Some(piece) = self.board[i][j]{
+                    match piece.color{
+                        //get_pseudo_legal_moves_for_square will return Some(), since
+                        //board[i][j] is a Piece, so the unwrap is safe
                         Color::White => white_attack_vec.append(&mut self.get_pseudo_legal_moves_for_square(i, j, true).unwrap()),
                         Color::Black => black_attack_vec.append(&mut self.get_pseudo_legal_moves_for_square(i, j, true).unwrap()),
                     }
@@ -694,68 +1146,6 @@ impl Game {
 
         self.white_attacked_squares = white_attack_vec;
         self.black_attacked_squares = black_attack_vec;
-    }
-
-    //get legal moves for a given square
-    pub fn get_legal_moves_square(&mut self, i : usize, j : usize) -> Vec<(usize, usize)>{
-        let color = self.board[i][j].unwrap().color;
-
-        let pos = (i, j);
-        let pseudo_legal_moves = self.get_pseudo_legal_moves_for_square(i, j, false).unwrap();
-        let mut legal_moves = Vec::new();
-
-        for mve in pseudo_legal_moves {
-            self.make_move_with_index(pos, mve, false).unwrap();
-
-            if !self.in_check(color) {
-                legal_moves.push(mve);
-            }
-            
-            self.undo_last_move();
-        }
-
-        return legal_moves;
-    }
-
-    //returns vector of tuples
-    //Each tuple is structured as (from, to), where "from" is the index of the piece that moves
-    //And "to" is a vector of the legal moves for that piece
-    pub fn get_all_legal_moves(&mut self, color : Color) -> HashMap<(usize, usize), Vec<(usize, usize)>> {
-        let mut move_hash : HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
-
-        for i in 0..8 {
-            for j in 0..8 {
-                if self.board[i][j].is_some() {
-                    if self.board[i][j].unwrap().color == color {
-                        let legal_moves = self.get_legal_moves_square(i, j);
-
-                        move_hash.insert((i, j), legal_moves);
-                    }
-                }
-            }
-        }
-
-        return move_hash;
-    }
-
-    /// Returns wether a player is in check or not
-    pub fn in_check(&self, color : Color) -> bool {
-        let attacked_squares = self.get_attacked_squares(color.opposite());
-
-        //Find king position
-        for i in 0..8 {
-            for j in 0..8 {
-                if self.board[i][j].is_some(){
-                    if self.board[i][j].unwrap().piece_type == PieceType::King
-                    && self.board[i][j].unwrap().color == color
-                    {
-                        return attacked_squares.contains(&(i, j));
-                    }
-                }
-            }
-        }
-
-        return false;
     }
 
     fn num_of_legal_moves(&mut self, color : Color) -> u32 {
@@ -775,9 +1165,9 @@ impl Game {
 
         for i in 0..8 {
             for j in 0..8 {
-                if self.board[i][j].is_some(){
-                    if self.board[i][j].unwrap().color == color {
-                        pieces.push(self.board[i][j].unwrap().piece_type);
+                if let Some(piece) = self.board[i][j]{
+                    if piece.color == color {
+                        pieces.push(piece.piece_type);
                     }
                 }
             }
@@ -785,60 +1175,28 @@ impl Game {
 
         return !self.insufficient_material.contains(&pieces);
     }
-
-    pub fn get_state(&mut self) -> GameState{
-        let current_turn_legal_moves = match self.turn {
-            Color::White => self.num_of_legal_moves(Color::White),
-            Color::Black => self.num_of_legal_moves(Color::Black),
-        };
-
-        if current_turn_legal_moves == 0 {
-            if self.in_check(self.turn) {
-                return GameState::Win(WinState::Checkmate(self.turn.opposite()));
-            } else {
-                return GameState::Draw(DrawState::Stalemate);
-            }
-        }
-
-        if self.half_moves >= 100 {
-            return GameState::Draw(DrawState::FiftyMoveRule);
-        }
-
-        if !self.can_win(Color::White) && !self.can_win(Color::Black) {
-            return GameState::Draw(DrawState::InsufficientMaterial);
-        }
-
-        return GameState::InProgress;
-    }
-
-    /// Set which type of piece a pawn should be promoted to
-    /// 
-    /// The promotion piece type is set to Piecetype::Queen by default
-    pub fn set_promotion_type(&mut self, piece_type : PieceType) {
-        self.promotion_piece = piece_type;
-    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GameState {
     InProgress,
+    AwaitPromotion,
     Win(WinState),
     Draw(DrawState),
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DrawState {
     Stalemate,
     InsufficientMaterial,
     FiftyMoveRule
 }
-#[derive(Debug, Clone)]
-
+#[derive(Debug, Clone, PartialEq)]
 //Color represents winner
 pub enum WinState {
     Checkmate(Color)
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Piece {
     piece_type : PieceType,
     color : Color,
@@ -951,6 +1309,10 @@ pub fn alg_notation_to_indx(notation : &str) -> Result<(usize , usize), String> 
         .chars()
         .collect::<Vec<char>>();
 
+    if chr_vec.len() != 2 {
+        return Err(format!("Invalid notation {}", notation));
+    }
+
     let col : usize = match chr_vec[0] {
         'a' => 0,
         'b' => 1,
@@ -960,11 +1322,15 @@ pub fn alg_notation_to_indx(notation : &str) -> Result<(usize , usize), String> 
         'f' => 5,
         'g' => 6,
         'h' => 7,
-        _c => return Err(format!("Invalid column {}", _c)),
+        _c => return Err(format!("Invalid file {}", _c)),
     };
 
     // 8 - n since ranks in the array are mirrored, and the first rank is at index 7
-    let row : usize = 8 - chr_vec[1].to_digit(10).unwrap() as usize;
+    let row = match chr_vec[1].to_digit(10) {
+        Some(digit) => 8 - digit as usize,
+        None => return Err(format!("Invalid row {}", chr_vec[1]))
+    };
+    
     
     return Ok((row, col));
 }
@@ -1011,34 +1377,90 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {   
-        let mut board = Game::from("4k3/1P6/4K3/8/8/8/8/8 w - - 0 1").unwrap();
 
-        println!("{:?}", board);
-
-        println!("{:?}", board);
-        println!("{:?}", board.get_state());
+    fn piece_getter_test() {
+            let game = Game::new_starting_pos();
+     
+        let piece = game.piece_at_array_index((0,0));
+        let top_left_piece = Piece::new(PieceType::Rook, Color::Black);
+    
+        assert_eq!(piece, Ok(Some(top_left_piece)));
     }
 
+    #[test]
+
+    fn possible_moves() {
+        let mut board = Game::new_starting_pos();
+
+        let x = board.get_all_legal_moves(Color::White);
+
+        println!("{:?}", x);
+    }
+
+    #[test]
+
+    //tests make_move function with different inputs
+    fn move_test() {   
+        let mut board = Game::new_starting_pos();
+
+        let valid_move = board.make_move("e2", "e4", false);
+        let invalid_move = board.make_move("f2", "f5", false);
+        let invalid_input = board.make_move("aksmldkams", "poköakenjf", false);
+        let empty_input = board.make_move("", "", false);
+
+        assert_eq!(valid_move, Ok(true));
+        assert_eq!(invalid_move, Ok(false));
+        assert_eq!(invalid_input.is_err(), true);
+        assert_eq!(empty_input.is_err(), true);
+    }
+
+    #[test]
+    fn test_undo() {
+        let mut game = Game::new_starting_pos();
+
+        let previous_game = game.clone();
+
+        game.make_move("e2", "e4", true).unwrap();
+
+        game.undo_last_move();
+
+        assert_eq!(previous_game, game);
+    }
+
+    #[test]
+
+    //Shows promotion functionality
+    //Also shows piece_at...() functionality
+    fn promotion_test() {
+        let mut board = Game::from_fen("8/1P6/8/8/8/8/1p6/8 w - - 0 1").unwrap();
+
+        board.make_move("b7", "b8", false).unwrap();
+
+        if board.get_state() == GameState::AwaitPromotion{
+            board.promote_to_piece(PieceType::Queen);
+        }
+        
+        assert_eq!(board.piece_at_alg_notation("b8").ok().unwrap(), 
+            Some(Piece::new(PieceType::Queen, Color::White)))
+    }
     
     #[test]
 
     //Make a board from FEN string
     //Also displays functionality of get_state()
-    fn fen_to_board_test(){
-        let mut board = Game::from("k1Q2b2/pp6/1qp2p2/3P3p/2p2B1P/2P5/PP4r1/1K1R4 b - - 1 34").unwrap();
-
-        println!("{:?}", board);
-        println!("{:?}", board.get_state());
+    fn board_from_fen_test(){
+        let board = Game::from_fen("k1Q2b2/pp6/1qp2p2/3P3p/2p2B1P/2P5/PP4r1/1K1R4 b - - 1 34").unwrap();
+            
+        assert_eq!(board.to_fen(), "k1Q2b2/pp6/1qp2p2/3P3p/2p2B1P/2P5/PP4r1/1K1R4 b - - 1 34");
     }
 
     #[test]
 
-    //Prints FEN string of starting position
+    //Shows functionality of new_starting_pos() and to_fen()
     fn board_to_fen_test(){
         let board = Game::new_starting_pos();
 
-        println!("{}", board.to_fen());
+        assert_eq!(board.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
     #[test]
@@ -1119,10 +1541,9 @@ mod tests {
         ];
 
         for (from, to) in moves {
-            board.make_move(from, to).unwrap();
+            board.make_move(from, to, true).unwrap();
         }
         
-        println!("{:?}", board);
-        println!("{:?}", board.get_state());
+        assert_eq!(board.get_state(), GameState::Win(WinState::Checkmate(Color::White)));
     }
 }
