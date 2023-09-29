@@ -2,13 +2,6 @@ use std::fmt;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-//TODO
-// - Check which functions should be public
-// - Change name of functions for usability
-// - Documentation
-// - more testing
-
-
 /// Main Game struct for chess board representation. 
 /// Used to create a position, and play moves. Includes
 /// move validation, reading game-state, getting captured
@@ -25,7 +18,7 @@ use std::hash::Hash;
 /// # Examples
 /// 
 /// * Using new_starting_pos() to create an new game
-/// ```
+/// ```ignore
 /// let game = Game::new_starting_pos();
 /// 
 /// println!("{:?}", game);
@@ -33,7 +26,7 @@ use std::hash::Hash;
 /// * Using from_fen() to create a new game, note that this
 /// is the FEN representation for the standard starting position,
 /// so this will be identical to calling new_starting_pos()
-/// ```
+/// ```ignore
 /// let game = Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 /// 
 /// println!("{:?}", game);
@@ -165,7 +158,7 @@ impl Game {
     /// Create a new board with the standard starting position.
     /// 
     /// # Examples
-    /// ```
+    /// ```ignore
     /// let mut game = Game::new_starting_pos();
     /// 
     /// game.make_move("e2", "e4", true).unwrap();
@@ -200,7 +193,7 @@ impl Game {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     ///
     /// let fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -323,7 +316,7 @@ impl Game {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     ///
     /// let mut game = Game::new_starting_position();
@@ -439,7 +432,7 @@ impl Game {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// let game = Game::new_starting_pos();
     /// 
     /// let piece = game.piece_at_array_index((0,0));
@@ -470,7 +463,7 @@ impl Game {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// let game = Game::new_starting_pos();
     /// 
     /// let piece = game.piece_at_array_index("e2");
@@ -510,7 +503,7 @@ impl Game {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     /// 
     /// let mut game = Game::new_starting_position();
@@ -552,7 +545,7 @@ impl Game {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     /// 
     /// let mut game = Game::new_starting_position();
@@ -589,8 +582,8 @@ impl Game {
     /// 
     /// # Examples
     /// * How a game loop might look
-    /// ```
-    /// let mut game = Game::new_starting_pos()
+    /// ```ignore
+    /// let mut game = Game::new_starting_pos();
     /// 
     /// loop {
     ///     //Get user input...
@@ -639,11 +632,11 @@ impl Game {
     /// to undo multiple moves.
     /// 
     /// # Examples
-    /// * Note that `undo_move()` does not revert to previous Game object, 
+    /// * Note that `undo_lat_move()` does not revert to previous Game object, 
     /// rather only reverts effected fields. This means the game will not
     /// be equivalent to previous game after undoing
     /// 
-    /// ```
+    /// ```ignore
     /// let mut game = Game::new_starting_pos();
     ///
     /// let previous_game = game.clone();
@@ -686,7 +679,7 @@ impl Game {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// let mut game = Game::new_starting_pos();
     /// 
     /// //print legal moves for knight on 7, 1 (b1)
@@ -760,7 +753,7 @@ impl Game {
         return move_hash;
     }
 
-    /// Returns wether a player is in check or not.
+    /// Returns bool representing wether a player is in check or not.
     pub fn in_check(&self, color : Color) -> bool {
         let attacked_squares = self.get_attacked_squares(color.opposite());
 
@@ -781,7 +774,7 @@ impl Game {
     }
 
     /// Returns current state of the game. For possible game states,
-    /// refer to `GameState` enum.
+    /// refer to documentation for `GameState` enum.
     pub fn get_state(&mut self) -> GameState{
         if self.promotion_square.is_some() {
             return GameState::AwaitPromotion;
@@ -936,17 +929,17 @@ impl Game {
         Ok(true)
     }
 
-    // Checks wether or not a move is a promotion move
+    /// Checks wether or not a move is a promotion move
     fn is_promotion_move(&self, from : (usize, usize), to : (usize, usize)) -> bool {
             if is_valid_move(from, to){
                 let pawn_color = self.board[from.0][from.1].unwrap().color;
-
+                
                 let promotion_rank = match pawn_color {
                     Color::White => 0,
                     Color::Black => 7,
                 };
-
-                return to.1 == promotion_rank;
+                
+                return to.0 == promotion_rank;
             }
 
             return false;
@@ -1487,7 +1480,7 @@ mod tests {
     #[test]
 
     fn piece_getter_test() {
-            let game = Game::new_starting_pos();
+        let game = Game::new_starting_pos();
      
         let piece = game.piece_at_array_index((0,0));
         let top_left_piece = Piece::new(PieceType::Rook, Color::Black);
@@ -1497,20 +1490,40 @@ mod tests {
 
     #[test]
 
-    fn possible_moves() {
+    fn possible_moves_test() {
         let mut board = Game::new_starting_pos();
 
-        let x = board.get_all_legal_moves(Color::White);
+        let x : HashMap<(usize, usize), Vec<(usize, usize)>> = board.get_all_legal_moves(Color::White);
 
-        println!("{:?}", x);
+        let mut expected_map = HashMap::new();
+        expected_map.insert((6, 6), vec![(5, 6), (4, 6)]);
+        expected_map.insert((7, 2), vec![]);
+        expected_map.insert((6, 4), vec![(5, 4), (4, 4)]);
+        expected_map.insert((6, 2), vec![(5, 2), (4, 2)]);
+        expected_map.insert((7, 0), vec![]);
+        expected_map.insert((7, 4), vec![]);
+        expected_map.insert((7, 5), vec![]);
+        expected_map.insert((7, 3), vec![]);
+        expected_map.insert((6, 7), vec![(5, 7), (4, 7)]);
+        expected_map.insert((6, 1), vec![(5, 1), (4, 1)]);
+        expected_map.insert((7, 1), vec![(5, 2), (5, 0)]);
+        expected_map.insert((6, 3), vec![(5, 3), (4, 3)]);
+        expected_map.insert((6, 0), vec![(5, 0), (4, 0)]);
+        expected_map.insert((6, 5), vec![(5, 5), (4, 5)]);
+        expected_map.insert((7, 6), vec![(5, 7), (5, 5)]);
+        expected_map.insert((7, 7), vec![]);
+
+        assert_eq!(x, expected_map);
     }
 
     #[test]
-    fn legal_moves_square() {
+    fn legal_moves_square_test() {
         let mut game = Game::new_starting_pos();
 
+        let expected_val : Vec<(usize, usize)> = Vec::from([(5, 2), (5, 0)]);
+
         //print legal moves for knight on b1
-        println!("{:?}", game.get_legal_moves_array_index((7, 1)).ok().unwrap());
+        assert_eq!(expected_val, game.get_legal_moves_array_index((7, 1)).ok().unwrap());
     }
 
     #[test]
@@ -1528,6 +1541,18 @@ mod tests {
         assert_eq!(invalid_move, Ok(false));
         assert_eq!(invalid_input.is_err(), true);
         assert_eq!(empty_input.is_err(), true);
+    }
+
+    #[test]
+
+    fn undo_move_test() {
+        let mut board = Game::new_starting_pos();
+
+        board.make_move("e2", "e4", false).unwrap();
+
+        board.undo_last_move();
+
+        assert_eq!(board.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
     #[test]

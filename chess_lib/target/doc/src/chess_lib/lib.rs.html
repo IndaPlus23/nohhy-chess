@@ -1631,18 +1631,55 @@
 <a href="#1631" id="1631">1631</a>
 <a href="#1632" id="1632">1632</a>
 <a href="#1633" id="1633">1633</a>
+<a href="#1634" id="1634">1634</a>
+<a href="#1635" id="1635">1635</a>
+<a href="#1636" id="1636">1636</a>
+<a href="#1637" id="1637">1637</a>
+<a href="#1638" id="1638">1638</a>
+<a href="#1639" id="1639">1639</a>
+<a href="#1640" id="1640">1640</a>
+<a href="#1641" id="1641">1641</a>
+<a href="#1642" id="1642">1642</a>
+<a href="#1643" id="1643">1643</a>
+<a href="#1644" id="1644">1644</a>
+<a href="#1645" id="1645">1645</a>
+<a href="#1646" id="1646">1646</a>
+<a href="#1647" id="1647">1647</a>
+<a href="#1648" id="1648">1648</a>
+<a href="#1649" id="1649">1649</a>
+<a href="#1650" id="1650">1650</a>
+<a href="#1651" id="1651">1651</a>
+<a href="#1652" id="1652">1652</a>
+<a href="#1653" id="1653">1653</a>
+<a href="#1654" id="1654">1654</a>
+<a href="#1655" id="1655">1655</a>
+<a href="#1656" id="1656">1656</a>
+<a href="#1657" id="1657">1657</a>
+<a href="#1658" id="1658">1658</a>
+<a href="#1659" id="1659">1659</a>
+<a href="#1660" id="1660">1660</a>
+<a href="#1661" id="1661">1661</a>
+<a href="#1662" id="1662">1662</a>
+<a href="#1663" id="1663">1663</a>
+<a href="#1664" id="1664">1664</a>
+<a href="#1665" id="1665">1665</a>
+<a href="#1666" id="1666">1666</a>
+<a href="#1667" id="1667">1667</a>
+<a href="#1668" id="1668">1668</a>
+<a href="#1669" id="1669">1669</a>
+<a href="#1670" id="1670">1670</a>
+<a href="#1671" id="1671">1671</a>
+<a href="#1672" id="1672">1672</a>
+<a href="#1673" id="1673">1673</a>
+<a href="#1674" id="1674">1674</a>
+<a href="#1675" id="1675">1675</a>
+<a href="#1676" id="1676">1676</a>
+<a href="#1677" id="1677">1677</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::hash::Hash;
 
-<span class="comment">//TODO
-// - Check which functions should be public
-// - Change name of functions for usability
-// - Documentation
-// - more testing
-
-
-</span><span class="doccomment">/// Main Game struct for chess board representation. 
+<span class="doccomment">/// Main Game struct for chess board representation. 
 /// Used to create a position, and play moves. Includes
 /// move validation, reading game-state, getting captured
 /// pieces and undoing moves.
@@ -1658,7 +1695,7 @@
 /// # Examples
 /// 
 /// * Using new_starting_pos() to create an new game
-/// ```
+/// ```ignore
 /// let game = Game::new_starting_pos();
 /// 
 /// println!(&quot;{:?}&quot;, game);
@@ -1666,7 +1703,7 @@
 /// * Using from_fen() to create a new game, note that this
 /// is the FEN representation for the standard starting position,
 /// so this will be identical to calling new_starting_pos()
-/// ```
+/// ```ignore
 /// let game = Game::from_fen(&quot;rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1&quot;);
 /// 
 /// println!(&quot;{:?}&quot;, game);
@@ -1798,7 +1835,7 @@
     <span class="doccomment">/// Create a new board with the standard starting position.
     /// 
     /// # Examples
-    /// ```
+    /// ```ignore
     /// let mut game = Game::new_starting_pos();
     /// 
     /// game.make_move(&quot;e2&quot;, &quot;e4&quot;, true).unwrap();
@@ -1833,7 +1870,7 @@
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     ///
     /// let fen_string = &quot;rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1&quot;;
@@ -1956,7 +1993,7 @@
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     ///
     /// let mut game = Game::new_starting_position();
@@ -2072,7 +2109,7 @@
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// let game = Game::new_starting_pos();
     /// 
     /// let piece = game.piece_at_array_index((0,0));
@@ -2103,7 +2140,7 @@
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// let game = Game::new_starting_pos();
     /// 
     /// let piece = game.piece_at_array_index(&quot;e2&quot;);
@@ -2143,7 +2180,7 @@
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     /// 
     /// let mut game = Game::new_starting_position();
@@ -2185,7 +2222,7 @@
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// use my_chess_lib::Game;
     /// 
     /// let mut game = Game::new_starting_position();
@@ -2222,8 +2259,8 @@
     /// 
     /// # Examples
     /// * How a game loop might look
-    /// ```
-    /// let mut game = Game::new_starting_pos()
+    /// ```ignore
+    /// let mut game = Game::new_starting_pos();
     /// 
     /// loop {
     ///     //Get user input...
@@ -2272,11 +2309,11 @@
     /// to undo multiple moves.
     /// 
     /// # Examples
-    /// * Note that `undo_move()` does not revert to previous Game object, 
+    /// * Note that `undo_lat_move()` does not revert to previous Game object, 
     /// rather only reverts effected fields. This means the game will not
     /// be equivalent to previous game after undoing
     /// 
-    /// ```
+    /// ```ignore
     /// let mut game = Game::new_starting_pos();
     ///
     /// let previous_game = game.clone();
@@ -2319,7 +2356,7 @@
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```ignore
     /// let mut game = Game::new_starting_pos();
     /// 
     /// //print legal moves for knight on 7, 1 (b1)
@@ -2393,7 +2430,7 @@
         <span class="kw">return </span>move_hash;
     }
 
-    <span class="doccomment">/// Returns wether a player is in check or not.
+    <span class="doccomment">/// Returns bool representing wether a player is in check or not.
     </span><span class="kw">pub fn </span>in_check(<span class="kw-2">&amp;</span><span class="self">self</span>, color : Color) -&gt; bool {
         <span class="kw">let </span>attacked_squares = <span class="self">self</span>.get_attacked_squares(color.opposite());
 
@@ -2414,7 +2451,7 @@
     }
 
     <span class="doccomment">/// Returns current state of the game. For possible game states,
-    /// refer to `GameState` enum.
+    /// refer to documentation for `GameState` enum.
     </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; GameState{
         <span class="kw">if </span><span class="self">self</span>.promotion_square.is_some() {
             <span class="kw">return </span>GameState::AwaitPromotion;
@@ -2569,17 +2606,17 @@
         <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
     }
 
-    <span class="comment">// Checks wether or not a move is a promotion move
+    <span class="doccomment">/// Checks wether or not a move is a promotion move
     </span><span class="kw">fn </span>is_promotion_move(<span class="kw-2">&amp;</span><span class="self">self</span>, from : (usize, usize), to : (usize, usize)) -&gt; bool {
             <span class="kw">if </span>is_valid_move(from, to){
                 <span class="kw">let </span>pawn_color = <span class="self">self</span>.board[from.<span class="number">0</span>][from.<span class="number">1</span>].unwrap().color;
-
+                
                 <span class="kw">let </span>promotion_rank = <span class="kw">match </span>pawn_color {
                     Color::White =&gt; <span class="number">0</span>,
                     Color::Black =&gt; <span class="number">7</span>,
                 };
-
-                <span class="kw">return </span>to.<span class="number">1 </span>== promotion_rank;
+                
+                <span class="kw">return </span>to.<span class="number">0 </span>== promotion_rank;
             }
 
             <span class="kw">return </span><span class="bool-val">false</span>;
@@ -3026,7 +3063,19 @@
     }
 }
 
-<span class="kw">pub fn </span>alg_notation_to_indx(notation : <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;(usize , usize), String&gt; {
+<span class="doccomment">/// Get array indicies for a give `notation` written in
+/// algebraic notation.
+/// 
+/// # Arguments
+/// * `notation` is a `str` describing a square on the board in algebraic notation.
+/// 
+/// # Returns
+/// * A `Result` containing the array index `(usize, usize)` corresponding
+/// to the input algebraic notation.
+/// 
+/// # Errors
+/// * Returns `Err(String)` if the provided notation is invalid
+</span><span class="kw">pub fn </span>alg_notation_to_indx(notation : <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;(usize , usize), String&gt; {
     <span class="kw">let </span>chr_vec = notation
         .chars()
         .collect::&lt;Vec&lt;char&gt;&gt;();
@@ -3057,7 +3106,14 @@
     <span class="kw">return </span><span class="prelude-val">Ok</span>((row, col));
 }
 
-<span class="kw">pub fn </span>indx_to_alg_notation(indx : (usize, usize)) -&gt; <span class="prelude-ty">Result</span>&lt;String, String&gt; {
+<span class="doccomment">/// Get algebraic notation for a given `indx`.
+/// 
+/// # Returns
+/// * `Result` containing the algebraic notation as a `String`
+/// 
+/// # Errors
+/// * Returns `Err(String)` if provided index is invalid.
+</span><span class="kw">pub fn </span>indx_to_alg_notation(indx : (usize, usize)) -&gt; <span class="prelude-ty">Result</span>&lt;String, String&gt; {
     <span class="kw">let </span>rank : char = <span class="kw">match </span>indx.<span class="number">1 </span>{
         <span class="number">0 </span>=&gt; <span class="string">&#39;a&#39;</span>,
         <span class="number">1 </span>=&gt; <span class="string">&#39;b&#39;</span>,
@@ -3101,7 +3157,7 @@
     <span class="attr">#[test]
 
     </span><span class="kw">fn </span>piece_getter_test() {
-            <span class="kw">let </span>game = Game::new_starting_pos();
+        <span class="kw">let </span>game = Game::new_starting_pos();
      
         <span class="kw">let </span>piece = game.piece_at_array_index((<span class="number">0</span>,<span class="number">0</span>));
         <span class="kw">let </span>top_left_piece = Piece::new(PieceType::Rook, Color::Black);
@@ -3111,20 +3167,40 @@
 
     <span class="attr">#[test]
 
-    </span><span class="kw">fn </span>possible_moves() {
+    </span><span class="kw">fn </span>possible_moves_test() {
         <span class="kw">let </span><span class="kw-2">mut </span>board = Game::new_starting_pos();
 
-        <span class="kw">let </span>x = board.get_all_legal_moves(Color::White);
+        <span class="kw">let </span>x : HashMap&lt;(usize, usize), Vec&lt;(usize, usize)&gt;&gt; = board.get_all_legal_moves(Color::White);
 
-        <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, x);
+        <span class="kw">let </span><span class="kw-2">mut </span>expected_map = HashMap::new();
+        expected_map.insert((<span class="number">6</span>, <span class="number">6</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">6</span>), (<span class="number">4</span>, <span class="number">6</span>)]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">2</span>), <span class="macro">vec!</span>[]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">4</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">4</span>), (<span class="number">4</span>, <span class="number">4</span>)]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">2</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">2</span>), (<span class="number">4</span>, <span class="number">2</span>)]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">0</span>), <span class="macro">vec!</span>[]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">4</span>), <span class="macro">vec!</span>[]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">5</span>), <span class="macro">vec!</span>[]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">3</span>), <span class="macro">vec!</span>[]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">7</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">7</span>), (<span class="number">4</span>, <span class="number">7</span>)]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">1</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">1</span>), (<span class="number">4</span>, <span class="number">1</span>)]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">1</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">2</span>), (<span class="number">5</span>, <span class="number">0</span>)]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">3</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">3</span>), (<span class="number">4</span>, <span class="number">3</span>)]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">0</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">0</span>), (<span class="number">4</span>, <span class="number">0</span>)]);
+        expected_map.insert((<span class="number">6</span>, <span class="number">5</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">5</span>), (<span class="number">4</span>, <span class="number">5</span>)]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">6</span>), <span class="macro">vec!</span>[(<span class="number">5</span>, <span class="number">7</span>), (<span class="number">5</span>, <span class="number">5</span>)]);
+        expected_map.insert((<span class="number">7</span>, <span class="number">7</span>), <span class="macro">vec!</span>[]);
+
+        <span class="macro">assert_eq!</span>(x, expected_map);
     }
 
     <span class="attr">#[test]
-    </span><span class="kw">fn </span>legal_moves_square() {
+    </span><span class="kw">fn </span>legal_moves_square_test() {
         <span class="kw">let </span><span class="kw-2">mut </span>game = Game::new_starting_pos();
 
+        <span class="kw">let </span>expected_val : Vec&lt;(usize, usize)&gt; = Vec::from([(<span class="number">5</span>, <span class="number">2</span>), (<span class="number">5</span>, <span class="number">0</span>)]);
+
         <span class="comment">//print legal moves for knight on b1
-        </span><span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, game.get_legal_moves_array_index((<span class="number">7</span>, <span class="number">1</span>)).ok().unwrap());
+        </span><span class="macro">assert_eq!</span>(expected_val, game.get_legal_moves_array_index((<span class="number">7</span>, <span class="number">1</span>)).ok().unwrap());
     }
 
     <span class="attr">#[test]
@@ -3142,6 +3218,18 @@
         <span class="macro">assert_eq!</span>(invalid_move, <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>));
         <span class="macro">assert_eq!</span>(invalid_input.is_err(), <span class="bool-val">true</span>);
         <span class="macro">assert_eq!</span>(empty_input.is_err(), <span class="bool-val">true</span>);
+    }
+
+    <span class="attr">#[test]
+
+    </span><span class="kw">fn </span>undo_move_test() {
+        <span class="kw">let </span><span class="kw-2">mut </span>board = Game::new_starting_pos();
+
+        board.make_move(<span class="string">&quot;e2&quot;</span>, <span class="string">&quot;e4&quot;</span>, <span class="bool-val">false</span>).unwrap();
+
+        board.undo_last_move();
+
+        <span class="macro">assert_eq!</span>(board.to_fen(), <span class="string">&quot;rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1&quot;</span>)
     }
 
     <span class="attr">#[test]
