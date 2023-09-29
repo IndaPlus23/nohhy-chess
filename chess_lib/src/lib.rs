@@ -8,7 +8,7 @@ use std::hash::Hash;
 /// pieces and undoing moves.
 /// 
 /// Supports reading data from the board using either algebraic notation
-/// or array indicies. Array indices `i` and `j` represent file and rank respectively,
+/// or array indicies. Array indices `i` and `j` represent rank and file respectively,
 /// and `0`, `0` representing a8 in algebraic notation. 
 /// 
 /// # Creation
@@ -48,9 +48,9 @@ pub struct Game {
     board : [[Option<Piece>; 8] ; 8],
     //turn indicator
     turn : Color,
-    //kingside casteling rights for both players
+    //kingside castling rights for both players
     kingside_castle : HashMap<Color, bool>,
-    //queenside casteling rights for both players
+    //queenside castling rights for both players
     queenside_castle : HashMap<Color, bool>,
     //index of possible en passant square
     en_passant_square : Option<(usize, usize)>,
@@ -252,7 +252,7 @@ impl Game {
             _c => return Err(format!("Invalid active field {}", _c)),
         };
 
-        // Map Casteling rights string to Board
+        // Map castling rights string to Board
         for c in fen_fields[2].chars() {
             match c {
                 'K' => {board.kingside_castle.insert(Color::White, true); },
@@ -265,7 +265,7 @@ impl Game {
                     board.kingside_castle.insert(Color::Black, false);
                     board.queenside_castle.insert(Color::Black, false);
                 },
-                _c => return Err(format!("Invalid casteling field {}", _c)),
+                _c => return Err(format!("Invalid castling field {}", _c)),
             } 
         }
 
@@ -369,11 +369,11 @@ impl Game {
 
         fen_str.push(' ');
 
-        //field 3 - casteling
+        //field 3 - castling
         let mut add_dash = true;
 
         //hardcoded get() call, unwrap will always be safe
-        //given that casteling fields are configured correctly
+        //given that castling fields are configured correctly
         if *self.kingside_castle.get(&Color::White).unwrap() {
             fen_str.push('K');
             add_dash = false;
@@ -892,7 +892,7 @@ impl Game {
             self.half_moves = 0; //piece captured : resets half moves
         }
 
-        //Check if casteling
+        //Check if castling
         //note board[i1][j1] is always Some(Piece) due to how
         //this function is called, so unwrap() wont panic
         if self.board[i1][j1].unwrap().piece_type == PieceType::King {
@@ -900,7 +900,7 @@ impl Game {
 
             //check if king is moved 2 squares
             if d.abs() == 2 {
-                //remove casteling rights
+                //remove castling rights
                 let king_color = self.board[i1][j1].unwrap().color;
                 self.kingside_castle.insert(king_color, false);
                 self.queenside_castle.insert(king_color, false);
@@ -915,7 +915,7 @@ impl Game {
                 }
             }
         } else if self.board[i1][j1].unwrap().piece_type == PieceType::Rook {
-            //remove casteling rights if the rook is moved
+            //remove castling rights if the rook is moved
 
             let rook_color = self.board[i1][j1].unwrap().color;
 
@@ -943,6 +943,27 @@ impl Game {
 
             if self.is_promotion_move(from, to) {
                 self.promotion_square = Some((i2, j2));
+            }
+        }
+
+        if let Some(piece) = self.board[i2][j2] {
+            if piece.piece_type == PieceType::Rook {
+                //remove castling rights if the rook is captured
+
+                let rook_color = self.board[i2][j2].unwrap().color;
+
+                let starting_rank = match rook_color {
+                    Color::White => 7,
+                    Color::Black => 0,
+                };
+
+                if i2 == starting_rank {
+                    match j2 {
+                        0 => {self.queenside_castle.insert(rook_color, false);},
+                        7 => {self.kingside_castle.insert(rook_color, false);},
+                        _ => (),
+                    }
+                }
             }
         }
 
@@ -1008,7 +1029,7 @@ impl Game {
     /// max_moves indicates how far a piece can "slide"
     /// used for calculating pseudo-legal moves for every piece except for the pawn and king*
     /// 
-    /// * the king has it's own function to include casteling, but uses this function as well
+    /// * the king has it's own function to include castling, but uses this function as well
     /// 
     /// # Panics
     /// Function panics if there is not a piece at index i, j
@@ -1181,7 +1202,7 @@ impl Game {
         let kingside = self.kingside_castle.get(&king_color).unwrap();
         let queenside = self.queenside_castle.get(&king_color).unwrap();
 
-        //Casteling logic
+        //castling logic
         
         if *kingside {
             //checks if squares between king and rook are empty, and are not attacked
@@ -1512,42 +1533,6 @@ fn can_en_passant(i : usize) -> Option<Color> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn test_test(){
-        let mut game = Game::new_starting_pos();
-
-        let mut running = true;
-
-        while running {
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input);
-
-            let mut input_iter = input.split_whitespace();
-
-            let from = input_iter.next().unwrap();
-            let to = input_iter.next().unwrap();
-
-            if let Ok(move_data) = game.make_move(from, to, false) {
-                if !move_data {
-                    println!("invalid move");
-                    continue;
-                }
-
-                println!("{:?}", game);
-        
-                match game.get_state(){
-                    GameState::AwaitPromotion => {
-                        let promote_piece_type = PieceType::Queen; //prompt user to choose piece type
-                        game.promote_to_piece(promote_piece_type);
-                    },
-                    _ => continue, //handle the remaining game states...
-                }
-            } else {
-                break;
-            }
-        }
-    }
-
     #[test]
 
     fn piece_getter_test() {
@@ -1605,13 +1590,25 @@ mod tests {
 
         let valid_move = board.make_move("e2", "e4", false);
         let invalid_move = board.make_move("f2", "f5", false);
+        let invalid_move2 = board.make_move("f4", "f5", false);
         let invalid_input = board.make_move("aksmldkams", "poköakenjf", false);
         let empty_input = board.make_move("", "", false);
 
         assert_eq!(valid_move, Ok(true));
         assert_eq!(invalid_move, Ok(false));
+        assert_eq!(invalid_move2, Ok(false));
         assert_eq!(invalid_input.is_err(), true);
         assert_eq!(empty_input.is_err(), true);
+    }
+
+    #[test]
+    fn castling_test() {
+        let mut board = Game::from_fen("r1bqkbnr/pppppppp/8/8/8/6n1/PPPPPPP1/RNBQK2R b KQkq - 0 1").unwrap();
+
+        board.make_move("g3", "e4", true).unwrap();
+
+        println!("{:?}", board);
+        println!("{:?}", board.get_legal_moves_alg_notation("e1").unwrap());
     }
 
     #[test]

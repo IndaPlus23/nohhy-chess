@@ -1675,6 +1675,41 @@
 <a href="#1675" id="1675">1675</a>
 <a href="#1676" id="1676">1676</a>
 <a href="#1677" id="1677">1677</a>
+<a href="#1678" id="1678">1678</a>
+<a href="#1679" id="1679">1679</a>
+<a href="#1680" id="1680">1680</a>
+<a href="#1681" id="1681">1681</a>
+<a href="#1682" id="1682">1682</a>
+<a href="#1683" id="1683">1683</a>
+<a href="#1684" id="1684">1684</a>
+<a href="#1685" id="1685">1685</a>
+<a href="#1686" id="1686">1686</a>
+<a href="#1687" id="1687">1687</a>
+<a href="#1688" id="1688">1688</a>
+<a href="#1689" id="1689">1689</a>
+<a href="#1690" id="1690">1690</a>
+<a href="#1691" id="1691">1691</a>
+<a href="#1692" id="1692">1692</a>
+<a href="#1693" id="1693">1693</a>
+<a href="#1694" id="1694">1694</a>
+<a href="#1695" id="1695">1695</a>
+<a href="#1696" id="1696">1696</a>
+<a href="#1697" id="1697">1697</a>
+<a href="#1698" id="1698">1698</a>
+<a href="#1699" id="1699">1699</a>
+<a href="#1700" id="1700">1700</a>
+<a href="#1701" id="1701">1701</a>
+<a href="#1702" id="1702">1702</a>
+<a href="#1703" id="1703">1703</a>
+<a href="#1704" id="1704">1704</a>
+<a href="#1705" id="1705">1705</a>
+<a href="#1706" id="1706">1706</a>
+<a href="#1707" id="1707">1707</a>
+<a href="#1708" id="1708">1708</a>
+<a href="#1709" id="1709">1709</a>
+<a href="#1710" id="1710">1710</a>
+<a href="#1711" id="1711">1711</a>
+<a href="#1712" id="1712">1712</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::hash::Hash;
@@ -1685,7 +1720,7 @@
 /// pieces and undoing moves.
 /// 
 /// Supports reading data from the board using either algebraic notation
-/// or array indicies. Array indices `i` and `j` represent file and rank respectively,
+/// or array indicies. Array indices `i` and `j` represent rank and file respectively,
 /// and `0`, `0` representing a8 in algebraic notation. 
 /// 
 /// # Creation
@@ -2346,6 +2381,37 @@
     /// of tuples `(usize, usize)` descibing the indicies in the 2d board array.
     /// 
     /// # Arguments
+    /// * `to` is algebraic notation for a square
+    /// 
+    /// # Returns
+    /// 
+    /// * Returns `Vec` of tuples `(usize, usize)` describing all array indicies
+    /// that the piece at the provided index can move to.
+    /// * Returns Result with empty vector if the board position is empty.
+    /// 
+    /// # Examples
+    /// 
+    /// ```ignore
+    /// let mut game = Game::new_starting_pos();
+    /// 
+    /// //print legal moves for knight on b1
+    /// println!(&quot;{:?}&quot;, game.get_legal_moves_alg_notation(&quot;b1&quot;).ok().unwrap());
+    /// ```
+    /// This will print `[(5, 2), (5, 0)]` corresponding to c3 and a3. 
+    /// 
+    /// # Errors
+    /// 
+    /// * If the provided index is invalid the function returns Err(String)
+    </span><span class="kw">pub fn </span>get_legal_moves_alg_notation(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pos : <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(usize, usize)&gt;, String&gt;{
+        <span class="kw">let </span>indx = alg_notation_to_indx(pos)<span class="question-mark">?</span>;
+
+        <span class="self">self</span>.get_legal_moves_array_index(indx)
+    }
+
+    <span class="doccomment">/// Get a `Vec` of legal moves for a given square. The vector consist 
+    /// of tuples `(usize, usize)` descibing the indicies in the 2d board array.
+    /// 
+    /// # Arguments
     /// * array index in the board, for more detail refer to `Game` struct.
     /// 
     /// # Returns
@@ -2513,6 +2579,11 @@
         <span class="comment">//return if move is illegal
         //ignored if check_legal is false
         </span><span class="kw">if </span>check_legal{
+            <span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(piece)) = <span class="self">self</span>.piece_at_array_index((i1, j1)) {
+                <span class="kw">if </span>piece.color != <span class="self">self</span>.turn {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
+                }
+            }
             <span class="comment">//get_legal_moves_square() will always return Some() since
             //index (i1, j1) is validated in make_move_array_index()
             </span><span class="kw">if </span>!(<span class="self">self</span>.get_legal_moves_array_index((i1, j1)).unwrap().contains(<span class="kw-2">&amp;</span>(i2, j2))) {
@@ -3153,7 +3224,6 @@
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
-
     <span class="attr">#[test]
 
     </span><span class="kw">fn </span>piece_getter_test() {
@@ -3200,7 +3270,7 @@
         <span class="kw">let </span>expected_val : Vec&lt;(usize, usize)&gt; = Vec::from([(<span class="number">5</span>, <span class="number">2</span>), (<span class="number">5</span>, <span class="number">0</span>)]);
 
         <span class="comment">//print legal moves for knight on b1
-        </span><span class="macro">assert_eq!</span>(expected_val, game.get_legal_moves_array_index((<span class="number">7</span>, <span class="number">1</span>)).ok().unwrap());
+        </span><span class="macro">assert_eq!</span>(expected_val, game.get_legal_moves_alg_notation(<span class="string">&quot;b1&quot;</span>).ok().unwrap());
     }
 
     <span class="attr">#[test]

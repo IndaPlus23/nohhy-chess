@@ -118,6 +118,8 @@ game.make_move("e2", "e4", false);
 ```rust
 game.make_move((4, 6), (4, 4), false);
 ```
+
+Note that castling also uses the same methods. 
 ### Promotion
 
 Promotion can either be done automatically, or handled by the user. 
