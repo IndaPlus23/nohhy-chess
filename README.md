@@ -164,3 +164,5 @@ while running {
 ## Contact
 
 For bug reports, feature requests, or other issues, please submit an issue at https://github.com/IndaPlus23/nohhy-chess/issues
+
+Please DM me on discord as well (username `part7jotaro`), since I don't check the issues page very often.
