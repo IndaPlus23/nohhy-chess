@@ -669,6 +669,37 @@ impl Game {
     /// of tuples `(usize, usize)` descibing the indicies in the 2d board array.
     /// 
     /// # Arguments
+    /// * `to` is algebraic notation for a square
+    /// 
+    /// # Returns
+    /// 
+    /// * Returns `Vec` of tuples `(usize, usize)` describing all array indicies
+    /// that the piece at the provided index can move to.
+    /// * Returns Result with empty vector if the board position is empty.
+    /// 
+    /// # Examples
+    /// 
+    /// ```ignore
+    /// let mut game = Game::new_starting_pos();
+    /// 
+    /// //print legal moves for knight on b1
+    /// println!("{:?}", game.get_legal_moves_alg_notation("b1").ok().unwrap());
+    /// ```
+    /// This will print `[(5, 2), (5, 0)]` corresponding to c3 and a3. 
+    /// 
+    /// # Errors
+    /// 
+    /// * If the provided index is invalid the function returns Err(String)
+    pub fn get_legal_moves_alg_notation(&mut self, pos : &str) -> Result<Vec<(usize, usize)>, String>{
+        let indx = alg_notation_to_indx(pos)?;
+
+        self.get_legal_moves_array_index(indx)
+    }
+
+    /// Get a `Vec` of legal moves for a given square. The vector consist 
+    /// of tuples `(usize, usize)` descibing the indicies in the 2d board array.
+    /// 
+    /// # Arguments
     /// * array index in the board, for more detail refer to `Game` struct.
     /// 
     /// # Returns
@@ -836,6 +867,11 @@ impl Game {
         //return if move is illegal
         //ignored if check_legal is false
         if check_legal{
+            if let Ok(Some(piece)) = self.piece_at_array_index((i1, j1)) {
+                if piece.color != self.turn {
+                    return Ok(false);
+                }
+            }
             //get_legal_moves_square() will always return Some() since
             //index (i1, j1) is validated in make_move_array_index()
             if !(self.get_legal_moves_array_index((i1, j1)).unwrap().contains(&(i2, j2))) {
@@ -1477,6 +1513,41 @@ fn can_en_passant(i : usize) -> Option<Color> {
 mod tests {
     use super::*;
 
+    fn test_test(){
+        let mut game = Game::new_starting_pos();
+
+        let mut running = true;
+
+        while running {
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input);
+
+            let mut input_iter = input.split_whitespace();
+
+            let from = input_iter.next().unwrap();
+            let to = input_iter.next().unwrap();
+
+            if let Ok(move_data) = game.make_move(from, to, false) {
+                if !move_data {
+                    println!("invalid move");
+                    continue;
+                }
+
+                println!("{:?}", game);
+        
+                match game.get_state(){
+                    GameState::AwaitPromotion => {
+                        let promote_piece_type = PieceType::Queen; //prompt user to choose piece type
+                        game.promote_to_piece(promote_piece_type);
+                    },
+                    _ => continue, //handle the remaining game states...
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
     #[test]
 
     fn piece_getter_test() {
@@ -1523,7 +1594,7 @@ mod tests {
         let expected_val : Vec<(usize, usize)> = Vec::from([(5, 2), (5, 0)]);
 
         //print legal moves for knight on b1
-        assert_eq!(expected_val, game.get_legal_moves_array_index((7, 1)).ok().unwrap());
+        assert_eq!(expected_val, game.get_legal_moves_alg_notation("b1").ok().unwrap());
     }
 
     #[test]
