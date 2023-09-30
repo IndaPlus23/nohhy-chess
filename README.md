@@ -4,10 +4,12 @@ API for chess logic.
 
 ## Table Of Contents
 
+- [Installation](#installation)
 - [Initializing the board](#initializing-the-board)
 - [From FEN](#from-fen)
 - [Fetching Data From the Board](#fetching-data-from-the-board)
     - [Pieces](#pieces)
+    - [Captures](#captures)
     - [Game State](#game-state)
         - [Board State](#board-state)
         - [Current Turn](#current-turn)
@@ -18,9 +20,17 @@ API for chess logic.
     - [Promotion](#promotion)
 - [Piece](#piece)
 - [Game Loop Example](#game-loop-example)
+- [Limitations](#limitations)
 - [Contact](#contact)
 
-# API Usage
+## Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+chess_lib = { git = "https://github.com/IndaPlus23/nohhy-chess.git" }
+```
 
 ## Initializing the board
 
@@ -75,6 +85,11 @@ let piece_data = game.piece_at_array_index((6, 4));
 
 println!("{:?}", piece_data);
 ```
+
+### Captures
+
+To get captured pieces use the `get_captures(color)` method. This
+will return all pieces captured by `color`.
 
 ### Game state
 

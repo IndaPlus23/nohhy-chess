@@ -1710,6 +1710,39 @@
 <a href="#1710" id="1710">1710</a>
 <a href="#1711" id="1711">1711</a>
 <a href="#1712" id="1712">1712</a>
+<a href="#1713" id="1713">1713</a>
+<a href="#1714" id="1714">1714</a>
+<a href="#1715" id="1715">1715</a>
+<a href="#1716" id="1716">1716</a>
+<a href="#1717" id="1717">1717</a>
+<a href="#1718" id="1718">1718</a>
+<a href="#1719" id="1719">1719</a>
+<a href="#1720" id="1720">1720</a>
+<a href="#1721" id="1721">1721</a>
+<a href="#1722" id="1722">1722</a>
+<a href="#1723" id="1723">1723</a>
+<a href="#1724" id="1724">1724</a>
+<a href="#1725" id="1725">1725</a>
+<a href="#1726" id="1726">1726</a>
+<a href="#1727" id="1727">1727</a>
+<a href="#1728" id="1728">1728</a>
+<a href="#1729" id="1729">1729</a>
+<a href="#1730" id="1730">1730</a>
+<a href="#1731" id="1731">1731</a>
+<a href="#1732" id="1732">1732</a>
+<a href="#1733" id="1733">1733</a>
+<a href="#1734" id="1734">1734</a>
+<a href="#1735" id="1735">1735</a>
+<a href="#1736" id="1736">1736</a>
+<a href="#1737" id="1737">1737</a>
+<a href="#1738" id="1738">1738</a>
+<a href="#1739" id="1739">1739</a>
+<a href="#1740" id="1740">1740</a>
+<a href="#1741" id="1741">1741</a>
+<a href="#1742" id="1742">1742</a>
+<a href="#1743" id="1743">1743</a>
+<a href="#1744" id="1744">1744</a>
+<a href="#1745" id="1745">1745</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::hash::Hash;
@@ -1760,9 +1793,9 @@
     </span>board : [[<span class="prelude-ty">Option</span>&lt;Piece&gt;; <span class="number">8</span>] ; <span class="number">8</span>],
     <span class="comment">//turn indicator
     </span>turn : Color,
-    <span class="comment">//kingside casteling rights for both players
+    <span class="comment">//kingside castling rights for both players
     </span>kingside_castle : HashMap&lt;Color, bool&gt;,
-    <span class="comment">//queenside casteling rights for both players
+    <span class="comment">//queenside castling rights for both players
     </span>queenside_castle : HashMap&lt;Color, bool&gt;,
     <span class="comment">//index of possible en passant square
     </span>en_passant_square : <span class="prelude-ty">Option</span>&lt;(usize, usize)&gt;,
@@ -1964,7 +1997,7 @@
             _c =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Invalid active field {}&quot;</span>, _c)),
         };
 
-        <span class="comment">// Map Casteling rights string to Board
+        <span class="comment">// Map castling rights string to Board
         </span><span class="kw">for </span>c <span class="kw">in </span>fen_fields[<span class="number">2</span>].chars() {
             <span class="kw">match </span>c {
                 <span class="string">&#39;K&#39; </span>=&gt; {board.kingside_castle.insert(Color::White, <span class="bool-val">true</span>); },
@@ -1977,7 +2010,7 @@
                     board.kingside_castle.insert(Color::Black, <span class="bool-val">false</span>);
                     board.queenside_castle.insert(Color::Black, <span class="bool-val">false</span>);
                 },
-                _c =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Invalid casteling field {}&quot;</span>, _c)),
+                _c =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Invalid castling field {}&quot;</span>, _c)),
             } 
         }
 
@@ -2081,11 +2114,11 @@
 
         fen_str.push(<span class="string">&#39; &#39;</span>);
 
-        <span class="comment">//field 3 - casteling
+        <span class="comment">//field 3 - castling
         </span><span class="kw">let </span><span class="kw-2">mut </span>add_dash = <span class="bool-val">true</span>;
 
         <span class="comment">//hardcoded get() call, unwrap will always be safe
-        //given that casteling fields are configured correctly
+        //given that castling fields are configured correctly
         </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.kingside_castle.get(<span class="kw-2">&amp;</span>Color::White).unwrap() {
             fen_str.push(<span class="string">&#39;K&#39;</span>);
             add_dash = <span class="bool-val">false</span>;
@@ -2604,7 +2637,7 @@
             <span class="self">self</span>.half_moves = <span class="number">0</span>; <span class="comment">//piece captured : resets half moves
         </span>}
 
-        <span class="comment">//Check if casteling
+        <span class="comment">//Check if castling
         //note board[i1][j1] is always Some(Piece) due to how
         //this function is called, so unwrap() wont panic
         </span><span class="kw">if </span><span class="self">self</span>.board[i1][j1].unwrap().piece_type == PieceType::King {
@@ -2612,7 +2645,7 @@
 
             <span class="comment">//check if king is moved 2 squares
             </span><span class="kw">if </span>d.abs() == <span class="number">2 </span>{
-                <span class="comment">//remove casteling rights
+                <span class="comment">//remove castling rights
                 </span><span class="kw">let </span>king_color = <span class="self">self</span>.board[i1][j1].unwrap().color;
                 <span class="self">self</span>.kingside_castle.insert(king_color, <span class="bool-val">false</span>);
                 <span class="self">self</span>.queenside_castle.insert(king_color, <span class="bool-val">false</span>);
@@ -2627,7 +2660,7 @@
                 }
             }
         } <span class="kw">else if </span><span class="self">self</span>.board[i1][j1].unwrap().piece_type == PieceType::Rook {
-            <span class="comment">//remove casteling rights if the rook is moved
+            <span class="comment">//remove castling rights if the rook is moved
 
             </span><span class="kw">let </span>rook_color = <span class="self">self</span>.board[i1][j1].unwrap().color;
 
@@ -2655,6 +2688,27 @@
 
             <span class="kw">if </span><span class="self">self</span>.is_promotion_move(from, to) {
                 <span class="self">self</span>.promotion_square = <span class="prelude-val">Some</span>((i2, j2));
+            }
+        }
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(piece) = <span class="self">self</span>.board[i2][j2] {
+            <span class="kw">if </span>piece.piece_type == PieceType::Rook {
+                <span class="comment">//remove castling rights if the rook is captured
+
+                </span><span class="kw">let </span>rook_color = <span class="self">self</span>.board[i2][j2].unwrap().color;
+
+                <span class="kw">let </span>starting_rank = <span class="kw">match </span>rook_color {
+                    Color::White =&gt; <span class="number">7</span>,
+                    Color::Black =&gt; <span class="number">0</span>,
+                };
+
+                <span class="kw">if </span>i2 == starting_rank {
+                    <span class="kw">match </span>j2 {
+                        <span class="number">0 </span>=&gt; {<span class="self">self</span>.queenside_castle.insert(rook_color, <span class="bool-val">false</span>);},
+                        <span class="number">7 </span>=&gt; {<span class="self">self</span>.kingside_castle.insert(rook_color, <span class="bool-val">false</span>);},
+                        <span class="kw">_ </span>=&gt; (),
+                    }
+                }
             }
         }
 
@@ -2720,7 +2774,7 @@
     /// max_moves indicates how far a piece can &quot;slide&quot;
     /// used for calculating pseudo-legal moves for every piece except for the pawn and king*
     /// 
-    /// * the king has it&#39;s own function to include casteling, but uses this function as well
+    /// * the king has it&#39;s own function to include castling, but uses this function as well
     /// 
     /// # Panics
     /// Function panics if there is not a piece at index i, j
@@ -2893,7 +2947,7 @@
         </span><span class="kw">let </span>kingside = <span class="self">self</span>.kingside_castle.get(<span class="kw-2">&amp;</span>king_color).unwrap();
         <span class="kw">let </span>queenside = <span class="self">self</span>.queenside_castle.get(<span class="kw-2">&amp;</span>king_color).unwrap();
 
-        <span class="comment">//Casteling logic
+        <span class="comment">//castling logic
         
         </span><span class="kw">if </span><span class="kw-2">*</span>kingside {
             <span class="comment">//checks if squares between king and rook are empty, and are not attacked
@@ -3281,13 +3335,25 @@
 
         <span class="kw">let </span>valid_move = board.make_move(<span class="string">&quot;e2&quot;</span>, <span class="string">&quot;e4&quot;</span>, <span class="bool-val">false</span>);
         <span class="kw">let </span>invalid_move = board.make_move(<span class="string">&quot;f2&quot;</span>, <span class="string">&quot;f5&quot;</span>, <span class="bool-val">false</span>);
+        <span class="kw">let </span>invalid_move2 = board.make_move(<span class="string">&quot;f4&quot;</span>, <span class="string">&quot;f5&quot;</span>, <span class="bool-val">false</span>);
         <span class="kw">let </span>invalid_input = board.make_move(<span class="string">&quot;aksmldkams&quot;</span>, <span class="string">&quot;poköakenjf&quot;</span>, <span class="bool-val">false</span>);
         <span class="kw">let </span>empty_input = board.make_move(<span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>, <span class="bool-val">false</span>);
 
         <span class="macro">assert_eq!</span>(valid_move, <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>));
         <span class="macro">assert_eq!</span>(invalid_move, <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>));
+        <span class="macro">assert_eq!</span>(invalid_move2, <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>));
         <span class="macro">assert_eq!</span>(invalid_input.is_err(), <span class="bool-val">true</span>);
         <span class="macro">assert_eq!</span>(empty_input.is_err(), <span class="bool-val">true</span>);
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>castling_test() {
+        <span class="kw">let </span><span class="kw-2">mut </span>board = Game::from_fen(<span class="string">&quot;r1bqkbnr/pppppppp/8/8/8/6n1/PPPPPPP1/RNBQK2R b KQkq - 0 1&quot;</span>).unwrap();
+
+        board.make_move(<span class="string">&quot;g3&quot;</span>, <span class="string">&quot;e4&quot;</span>, <span class="bool-val">true</span>).unwrap();
+
+        <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, board);
+        <span class="macro">println!</span>(<span class="string">&quot;{:?}&quot;</span>, board.get_legal_moves_alg_notation(<span class="string">&quot;e1&quot;</span>).unwrap());
     }
 
     <span class="attr">#[test]
