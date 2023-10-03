@@ -1333,8 +1333,8 @@ pub enum WinState {
 /// # Examples
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Piece {
-    piece_type : PieceType,
-    color : Color,
+    pub piece_type : PieceType,
+    pub color : Color,
 }
 
 impl Piece {
