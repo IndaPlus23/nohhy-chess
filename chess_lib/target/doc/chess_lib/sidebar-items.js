@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["Color","DrawState","GameState","PieceType","WinState"],"fn":["alg_notation_to_indx","indx_to_alg_notation"],"struct":["Game","Piece"]};
