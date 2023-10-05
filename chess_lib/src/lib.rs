@@ -884,7 +884,6 @@ impl Game {
 
         //increment half moves, if there is a capture or pawn move this will be reset
         self.half_moves += 1;
-        self.en_passant_square = None;
 
         //Capture logic
         if let Some(piece) = self.board[i2][j2] {
@@ -934,6 +933,8 @@ impl Game {
         } else if self.board[i1][j1].unwrap().piece_type == PieceType::Pawn {
             self.half_moves = 0; //pawn moved : reset half moves
 
+            let pawn_color = self.board[i1][j1].unwrap().color;
+
             //check if pawn is moved two squares
             let d = i1 as i32 - i2 as i32;
 
@@ -943,6 +944,15 @@ impl Game {
 
             if self.is_promotion_move(from, to) {
                 self.promotion_square = Some((i2, j2));
+            }
+
+            if self.en_passant_square.is_some(){
+                if (i2, j2) == self.en_passant_square.unwrap() {
+                    match pawn_color {
+                        Color::White => self.board[i2 + 1][j2] = None,
+                        Color::Black => self.board[i2 - 1][j2] = None,
+                    }
+                }
             }
         }
 
@@ -981,6 +991,7 @@ impl Game {
             self.full_moves += 1;
         }
 
+        self.en_passant_square = None;
         self.turn = self.turn.opposite();
 
         Ok(true)
@@ -1525,7 +1536,7 @@ pub fn indx_to_alg_notation(indx : (usize, usize)) -> Result<String, String> {
 fn can_en_passant(i : usize) -> Option<Color> {
     match i {
         2 => Some(Color::White),
-        6 => Some(Color::Black),
+        5 => Some(Color::Black),
         _ => None,
     }
 }
